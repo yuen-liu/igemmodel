@@ -45,4 +45,8 @@ source "$VENV_DIR/bin/activate"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
 
+# binder_design.py lives alongside the notebooks, not next to this script —
+# launch from there so `from binder_design import ...` resolves without
+# needing a manual %cd in the notebook.
+cd "$HOME/notebooks"
 jupyter lab --no-browser --ip=$(hostname -s)
