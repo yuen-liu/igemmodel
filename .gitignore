@@ -3,3 +3,4 @@ genie3
 boltz-experiments/
 notebooks/bridget/.env
 data/
+.env
