@@ -4,3 +4,4 @@ boltz-experiments/
 notebooks/bridget/.env
 data/
 .env
+.DS_Store
