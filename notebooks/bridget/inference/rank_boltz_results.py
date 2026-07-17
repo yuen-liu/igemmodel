@@ -28,9 +28,9 @@ from pathlib import Path
 import pandas as pd
 
 
-def _record_from_item(item: dict) -> dict | None:
+def _record_from_item(item: dict, binder_chain_id: str = "C") -> dict | None:
     binder_seq = next(
-        (e["value"] for e in item.get("entities", []) if "C" in e.get("chain_ids", [])),
+        (e["value"] for e in item.get("entities", []) if binder_chain_id in e.get("chain_ids", [])),
         None,
     )
     if binder_seq is None:
@@ -47,13 +47,13 @@ def _record_from_item(item: dict) -> dict | None:
     }
 
 
-def load_results_from_metadata(results_dir: Path) -> pd.DataFrame:
+def load_results_from_metadata(results_dir: Path, binder_chain_id: str = "C") -> pd.DataFrame:
     records = []
     for meta_path in sorted(results_dir.glob("pres_*/metadata.json")):
         item = json.loads(meta_path.read_text())
-        record = _record_from_item(item)
+        record = _record_from_item(item, binder_chain_id)
         if record is None:
-            print(f"Skipping {meta_path}: no chain C entity found")
+            print(f"Skipping {meta_path}: no chain {binder_chain_id} entity found")
             continue
         records.append(record)
     if not records:
@@ -61,7 +61,7 @@ def load_results_from_metadata(results_dir: Path) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def load_results_from_index(index_path: Path) -> pd.DataFrame:
+def load_results_from_index(index_path: Path, binder_chain_id: str = "C") -> pd.DataFrame:
     records = []
     with open(index_path) as f:
         for line_num, line in enumerate(f, 1):
@@ -69,9 +69,9 @@ def load_results_from_index(index_path: Path) -> pd.DataFrame:
             if not line:
                 continue
             item = json.loads(line)
-            record = _record_from_item(item)
+            record = _record_from_item(item, binder_chain_id)
             if record is None:
-                print(f"Skipping line {line_num}: no chain C entity found")
+                print(f"Skipping line {line_num}: no chain {binder_chain_id} entity found")
                 continue
             records.append(record)
     if not records:
@@ -85,13 +85,18 @@ def main() -> None:
     parser.add_argument("--index-jsonl", type=Path, default=None)
     parser.add_argument("--top-n", type=int, default=500)
     parser.add_argument("--output", type=Path, default=Path("manifest.csv"))
+    parser.add_argument(
+        "--binder-chain-id",
+        default="C",
+        help="Chain id of the designed binder entity in metadata.json/index.jsonl (not the auth_asym_id in the predicted structure).",
+    )
     args = parser.parse_args()
 
     if args.index_jsonl is not None:
-        df = load_results_from_index(args.index_jsonl)
+        df = load_results_from_index(args.index_jsonl, args.binder_chain_id)
         print(f"Loaded {len(df)} results from {args.index_jsonl}")
     elif args.results_dir is not None:
-        df = load_results_from_metadata(args.results_dir)
+        df = load_results_from_metadata(args.results_dir, args.binder_chain_id)
         print(f"Loaded {len(df)} results from {args.results_dir}")
     else:
         parser.error("must pass either --results-dir or --index-jsonl")
