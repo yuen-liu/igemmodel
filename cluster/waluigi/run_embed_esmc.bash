@@ -6,6 +6,10 @@ set -euo pipefail
 #   tmux new -s embed_esmc
 #   bash run_embed_esmc.bash --manifest ~/notebooks/manifest.csv --output ~/notebooks/embeddings.npz
 #
+# Multi-layer mode (one forward pass, all layers in one .npz) -- add --layers:
+#   bash run_embed_esmc.bash --manifest ~/notebooks/manifest.csv \
+#       --output ~/notebooks/embeddings_all_layers.npz --layers all
+#
 # Reuses the esmfold2_venv set up by start_jupyter_esmfold2.bash (same
 # transformers/ESM-C install, same torch cu118 pin) -- this script only runs
 # embed_esmc.py, which loads ESM-C alone (no ESMFold2 inversion/critic
