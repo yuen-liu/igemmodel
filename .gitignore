@@ -7,3 +7,4 @@ data/
 .DS_Store
 __pycache__/
 vilip1_layer23_per_residue/
+vilip1_layer23_sae_outputs/
