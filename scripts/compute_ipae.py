@@ -11,7 +11,7 @@ threshold like ipae<4 implies the unnormalized value).
 
 Chain assignment (which token indices are target vs binder) is parsed from
 the predicted .cif directly, using the same Boltz mmCIF field layout and
-CA-token masking as the vendored ipsae.py (see vendor/ipsae.py), so results
+CA-token masking as the vendored ipsae.py (see ipsae.py), so results
 are directly comparable to the ipSAE numbers computed there.
 
 Usage:
@@ -31,7 +31,7 @@ CA_ATOM_NAMES = {"CA"}
 
 def parse_cif_chains(cif_path: Path) -> np.ndarray:
     """Return an array of chain ids, one per CA-atom token, in file order --
-    matching the token ordering boltz's pae.npz uses (see vendor/ipsae.py's
+    matching the token ordering boltz's pae.npz uses (see ipsae.py's
     Boltz mmCIF parsing logic, which this mirrors)."""
     field_idx = {}
     field_num = 0

@@ -1,6 +1,6 @@
 """Batch-compute ipSAE (interface predicted aligned error score) for a
 directory of Boltz protein-design results, using the vendored reference
-implementation from DunbrackLab/IPSAE (vendor/ipsae.py, MIT license,
+implementation from DunbrackLab/IPSAE (ipsae.py, MIT license,
 https://github.com/DunbrackLab/IPSAE, https://www.biorxiv.org/content/10.1101/2025.02.10.637595).
 
 We call the vendored script verbatim as a subprocess per result rather than
@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pandas as pd
 
-VENDOR_SCRIPT = Path(__file__).parent / "vendor" / "ipsae.py"
+VENDOR_SCRIPT = Path(__file__).parent / "ipsae.py"
 
 
 def find_result_dirs(results_dir: Path) -> list[Path]:
