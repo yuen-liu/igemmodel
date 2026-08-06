@@ -15,8 +15,8 @@ from the CUDA-11.8 pin that venv needs for Waluigi's older driver):
         --output-dir benchmark_results
 
 For each held-out validation sequence (protein ids stored in our own
-checkpoint, from data.py's stratified split) and the 13 natural-binder
-sequences:
+checkpoint, from data.py's stratified split) and the eval-only natural-binder
+sequences (data.EVAL_ONLY_SOURCES):
   1. Run the REAL biohub/ESMC-300M model with Biohub's OFFICIAL SAE hook
      attached at layer 23 (model.add_sae_models(...)) to get
      output["sae_outputs"]["layer23"] (their actual sparse codes) and
@@ -47,7 +47,7 @@ from huggingface_hub import hf_hub_download
 from safetensors import safe_open
 from transformers import AutoModel, AutoTokenizer
 
-from data import center_scale, uncenter_unscale
+from data import EVAL_ONLY_SOURCES, center_scale, uncenter_unscale
 from sae_model import SparseAutoencoder
 
 BIOHUB_MODEL = "biohub/ESMC-300M"
@@ -63,12 +63,49 @@ def load_biohub_decoder_weights(layer: int = LAYER) -> tuple[torch.Tensor, torch
         return f.get_tensor("W_dec"), f.get_tensor("b_dec")
 
 
-def fve(x: torch.Tensor, recon: torch.Tensor, baseline_mean: torch.Tensor) -> float:
-    """Fraction of variance explained against a SHARED fixed baseline (not
-    each model's own convention), so both models' numbers are comparable."""
-    sq_err = (x - recon).pow(2).sum(dim=-1).sum().item()
-    sq_baseline = (x - baseline_mean).pow(2).sum(dim=-1).sum().item()
-    return 1.0 - sq_err / max(sq_baseline, 1e-12)
+class RunningStats:
+    """Accumulates FVE/L0/dead-feature stats per (split, model, source)
+    batch-by-batch, instead of holding every residue's full code vectors
+    for an entire split in memory -- the latter OOM-kills on Waluigi once
+    the held-out split reaches ~200k residues x Biohub's 16384-wide
+    codebook (~13GB for that one tensor alone, on top of ours/x/recons)."""
+
+    def __init__(self):
+        self._entries: dict[tuple[str, str, str], dict] = {}
+
+    def update(self, split: str, model: str, source: str, dict_size: int, x: torch.Tensor, recon: torch.Tensor, baseline_mean: torch.Tensor, codes: torch.Tensor) -> None:
+        key = (split, model, source)
+        e = self._entries.get(key)
+        if e is None:
+            e = {
+                "dict_size": dict_size,
+                "sq_err": 0.0,
+                "sq_baseline": 0.0,
+                "l0_sum": 0.0,
+                "n": 0,
+                "ever_nonzero": torch.zeros(dict_size, dtype=torch.bool, device=codes.device),
+            }
+            self._entries[key] = e
+        e["sq_err"] += (x - recon).pow(2).sum().item()
+        e["sq_baseline"] += (x - baseline_mean).pow(2).sum().item()
+        e["l0_sum"] += (codes != 0).sum().item()
+        e["n"] += x.shape[0]
+        e["ever_nonzero"] |= (codes != 0).any(dim=0)
+
+    def rows(self, split: str):
+        for (s, model, source), e in self._entries.items():
+            if s != split:
+                continue
+            yield {
+                "split": split,
+                "model": model,
+                "source": source,
+                "n_residues": e["n"],
+                "fve": 1.0 - e["sq_err"] / max(e["sq_baseline"], 1e-12),
+                "avg_l0": e["l0_sum"] / e["n"],
+                "n_dead": e["dict_size"] - int(e["ever_nonzero"].sum().item()),
+                "dict_size": e["dict_size"],
+            }
 
 
 def run_batches(model, tokenizer, sequences, device, batch_size, smoke_test):
@@ -139,7 +176,7 @@ def main():
     manifest = pd.read_csv(args.manifest)
     val_ids = set(ckpt["val_protein_ids"].tolist())
     val_rows = manifest[manifest["id"].isin(val_ids)]
-    natural_rows = manifest[manifest["source"] == "natural_binders"]
+    natural_rows = manifest[manifest["source"].isin(EVAL_ONLY_SOURCES)]
 
     print(f"Loading {BIOHUB_MODEL} + official SAE hook at layer {LAYER}...")
     model = AutoModel.from_pretrained(BIOHUB_MODEL, device_map="auto").eval()
@@ -152,28 +189,22 @@ def main():
     biohub_W_dec, biohub_b_dec = load_biohub_decoder_weights()
     biohub_W_dec, biohub_b_dec = biohub_W_dec.to(device), biohub_b_dec.to(device)
 
-    all_rows = []
+    our_dict_size = ckpt["config"]["d_hidden"]
+    biohub_dict_size = 16384
+    stats = RunningStats()
     for split_name, rows in [("held_out_designs", val_rows), ("natural_binders_qualitative", natural_rows)]:
         sequences = rows["sequence"].tolist()
         sources = rows["source"].tolist()
         ids = rows["id"].tolist()
         print(f"{split_name}: {len(sequences)} sequences" + (" (smoke test: first 2 only)" if args.smoke_test else ""))
 
-        x_parts, our_recon_parts, our_codes_parts = [], [], []
-        biohub_recon_parts, biohub_codes_parts = [], []
-        source_parts = []
-
         for seq_i, hidden, official_codes in run_batches(
             model, tokenizer, sequences, device, args.batch_size, args.smoke_test
         ):
-            x_parts.append(hidden)
-            source_parts.extend([sources[seq_i]] * hidden.shape[0])
-
             x_proc = center_scale(hidden, our_mean, our_scale)
             with torch.no_grad():
                 our_recon_proc, _, _, our_codes = our_model(x_proc)
-            our_recon_parts.append(uncenter_unscale(our_recon_proc, our_mean, our_scale))
-            our_codes_parts.append(our_codes)
+            our_recon = uncenter_unscale(our_recon_proc, our_mean, our_scale)
 
             # Biohub's real forward() (verified from their installed source,
             # transformers.models.esmc.modeling_esmc_sae._ESMCSAELayer)
@@ -187,40 +218,22 @@ def main():
             token_mean = hidden.mean(dim=-1, keepdim=True)
             token_std = (hidden - token_mean).std(dim=-1, keepdim=True)
             biohub_recon_normalized = official_codes @ biohub_W_dec + biohub_b_dec
-            biohub_recon_parts.append(biohub_recon_normalized * (token_std + 1e-5) + token_mean)
-            biohub_codes_parts.append(official_codes)
+            biohub_recon = biohub_recon_normalized * (token_std + 1e-5) + token_mean
+
+            source = sources[seq_i]
+            # accumulate per-batch running stats only (not full per-residue
+            # tensors for the whole split -- see RunningStats docstring)
+            for src in ("__pooled__", source):
+                stats.update(split_name, "ours", src, our_dict_size, hidden, our_recon, our_mean, our_codes)
+                stats.update(split_name, "biohub", src, biohub_dict_size, hidden, biohub_recon, our_mean, official_codes)
 
             print(f"  {ids[seq_i]} (len={hidden.shape[0]}) processed")
 
-        x = torch.cat(x_parts)
-        sources_arr = numpy.array(source_parts)
-        our_recon, our_codes = torch.cat(our_recon_parts), torch.cat(our_codes_parts)
-        biohub_recon, biohub_codes = torch.cat(biohub_recon_parts), torch.cat(biohub_codes_parts)
-
-        for name, recon, codes, dict_size in [
-            ("ours", our_recon, our_codes, ckpt["config"]["d_hidden"]),
-            ("biohub", biohub_recon, biohub_codes, 16384),
-        ]:
-            for src in ["__pooled__"] + sorted(set(source_parts)):
-                mask = slice(None) if src == "__pooled__" else (sources_arr == src)
-                n = int(mask.sum()) if src != "__pooled__" else x.shape[0]
-                if n == 0:
-                    continue
-                n_dead = dict_size - int((codes[mask] != 0).any(dim=0).sum().item())
-                all_rows.append(
-                    {
-                        "split": split_name,
-                        "model": name,
-                        "source": src,
-                        "n_residues": n,
-                        "fve": fve(x[mask], recon[mask], our_mean),
-                        "avg_l0": (codes[mask] != 0).sum(dim=-1).float().mean().item(),
-                        "n_dead": n_dead,
-                        "dict_size": dict_size,
-                    }
-                )
-            pooled = [r for r in all_rows if r["split"] == split_name and r["model"] == name and r["source"] == "__pooled__"][0]
+        for name in ("ours", "biohub"):
+            pooled = next(r for r in stats.rows(split_name) if r["model"] == name and r["source"] == "__pooled__")
             print(f"  {name}: fve={pooled['fve']:.4f} dead={pooled['n_dead']}/{pooled['dict_size']}")
+
+    all_rows = [r for split_name in ("held_out_designs", "natural_binders_qualitative") for r in stats.rows(split_name)]
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     out_df = pd.DataFrame(all_rows)

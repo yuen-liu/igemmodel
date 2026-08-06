@@ -7,13 +7,16 @@ embed_esmc.py --per-residue) containing:
     index.csv: id, start, length -- activations[start:start+length] is that
         id's residues, in sequence order.
     manifest_combined.csv: id, sequence, source -- source in
-        {"vilip1_full20k", "composite_hotspot", "natural_binders"}.
+        {"vilip1_full20k", "composite_hotspot", "composite_hotspot_20260728",
+        "natural_binders", "binder_dataset_vilip1"}.
 
-`source == "natural_binders"` rows are dropped entirely here -- those 13
-real UniProt sequences are held out as a qualitative eval-only set (not
-statistically meaningful for training at 13/25013 rows, and structurally
-very different: 84-815 residues vs. the two design campaigns' 50-80 and
-100-150), evaluated separately, not part of this train/val split.
+Rows whose source is in EVAL_ONLY_SOURCES are dropped entirely here -- those
+are real UniProt sequences (13 hand-picked natural binders + 69 more pulled
+from STRING functional/physical-association data, `binder_dataset_raw.csv`)
+held out as a qualitative eval-only set, not part of this train/val split:
+too few points to be statistically meaningful for training, and
+structurally very different from the design campaigns (real protein lengths
+vs. the designs' 50-80/100-150 residue binders).
 
 vilip1_full20k and composite_hotspot are the same POI (vilip1) but
 different binder-length regimes (50-80 vs. 100-150 residues) at different
@@ -31,6 +34,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+
+# Sources held out entirely from train/val -- real UniProt proteins used
+# only for qualitative eval (see module docstring), never trained on.
+EVAL_ONLY_SOURCES = {"natural_binders", "binder_dataset_vilip1"}
 
 
 @dataclass
@@ -82,10 +89,11 @@ def load_dataset(data_dir: Path, val_fraction: float = 0.1, seed: int = 0) -> SA
     merged = index_df.merge(manifest_df, on="id", how="left")
     assert merged["source"].notna().all(), "some index.csv ids missing from manifest_combined.csv"
 
-    design_df = merged[merged["source"] != "natural_binders"].reset_index(drop=True)
+    design_df = merged[~merged["source"].isin(EVAL_ONLY_SOURCES)].reset_index(drop=True)
     print(
         f"{len(design_df)}/{len(merged)} proteins are designs (excluding "
-        f"{len(merged) - len(design_df)} natural_binders, held out for eval only)"
+        f"{len(merged) - len(design_df)} eval-only proteins from {EVAL_ONLY_SOURCES}, "
+        "held out for eval only)"
     )
 
     train_ids, val_ids = _stratified_protein_split(design_df, val_fraction, seed)
@@ -100,7 +108,7 @@ def load_dataset(data_dir: Path, val_fraction: float = 0.1, seed: int = 0) -> SA
         counts = rows["source"].value_counts()
         print(f"{name}: {len(rows)} proteins, {len(idx)} residues -- by source: {counts.to_dict()}")
 
-    acts = np.load(data_dir / "activations.npy")  # full load into RAM, not memmap (~3.7GB total)
+    acts = np.load(data_dir / "activations.npy")  # full load into RAM, not memmap
     train_x = torch.from_numpy(acts[train_idx].copy())
     val_x = torch.from_numpy(acts[val_idx].copy())
     del acts
