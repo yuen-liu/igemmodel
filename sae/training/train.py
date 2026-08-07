@@ -78,6 +78,21 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--d-hidden", type=int, default=4096)
     parser.add_argument("--k", type=int, default=64)
+    parser.add_argument(
+        "--k-start",
+        type=int,
+        default=None,
+        help="Initial k for the annealing schedule (defaults to 4x --k). "
+        "Linearly decayed down to --k over --k-anneal-frac of total steps, "
+        "then held at --k. See sae_model.py's K-ANNEALING docstring.",
+    )
+    parser.add_argument(
+        "--k-anneal-frac",
+        type=float,
+        default=0.2,
+        help="Fraction of total training steps over which k decays from "
+        "--k-start to --k. Set to 0 to disable annealing (k fixed at --k).",
+    )
     parser.add_argument("--auxk", type=int, default=256)
     parser.add_argument("--dead-tokens-threshold", type=int, default=400_000)
     parser.add_argument("--batch-size", type=int, default=4096)
@@ -119,6 +134,15 @@ def main() -> None:
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
+    k_start = args.k_start if args.k_start is not None else 4 * args.k
+    k_anneal_steps = max(1, int(args.k_anneal_frac * total_steps))
+
+    def current_k(step: int) -> int:
+        if args.k_anneal_frac <= 0 or k_start <= args.k:
+            return args.k
+        frac = min(1.0, step / k_anneal_steps)
+        return round(k_start + frac * (args.k - k_start))
+
     args.output_dir.mkdir(parents=True, exist_ok=True)
     log_path = args.output_dir / "training_log.csv"
     log_fields = [
@@ -144,7 +168,8 @@ def main() -> None:
         epoch_mse, epoch_auxk, n_batches = 0.0, 0.0, 0
         for batch in iter_batches(ds.train_x, args.batch_size, shuffle=True, generator=generator):
             x_proc = center_scale(batch.to(device), mean, scale)
-            recon, auxk_recon, num_dead, _ = model(x_proc)
+            step_k = current_k(step)
+            recon, auxk_recon, num_dead, _ = model(x_proc, k=step_k)
             mse_loss, auxk_loss = loss_fn(x_proc, recon, auxk_recon)
             loss = mse_loss + auxk_loss
 
@@ -163,7 +188,8 @@ def main() -> None:
             if step % args.log_every == 0:
                 print(
                     f"  step {step}/{total_steps}: mse={mse_loss.item():.4f} "
-                    f"auxk={auxk_loss.item():.4f} num_dead={num_dead} lr={scheduler.get_last_lr()[0]:.2e}"
+                    f"auxk={auxk_loss.item():.4f} num_dead={num_dead} k={step_k} "
+                    f"lr={scheduler.get_last_lr()[0]:.2e}"
                 )
 
         train_mse = epoch_mse / max(n_batches, 1)
@@ -175,7 +201,7 @@ def main() -> None:
         print(
             f"epoch {epoch}: train_mse={train_mse:.4f} train_auxk={train_auxk:.4f} "
             f"val_fve={pooled['fve']:.4f} val_l0={pooled['avg_l0']:.1f} num_dead={num_dead} "
-            f"({elapsed:.1f}s) -- {per_source_str}"
+            f"end_k={current_k(step - 1)} ({elapsed:.1f}s) -- {per_source_str}"
         )
 
         with open(log_path, "a", newline="") as f:
@@ -186,6 +212,10 @@ def main() -> None:
 
         checkpoint = {
             "model_state_dict": model.state_dict(),
+            # NOTE: keep this dict limited to SparseAutoencoder.__init__'s actual
+            # params -- benchmark.py does SparseAutoencoder(**ckpt["config"]).
+            # k_start/k_anneal_frac are training-only and already captured below
+            # in "args" (and resolved k_start in "k_start_resolved").
             "config": {
                 "d_model": d_model,
                 "d_hidden": args.d_hidden,
@@ -193,6 +223,7 @@ def main() -> None:
                 "auxk": args.auxk,
                 "dead_tokens_threshold": args.dead_tokens_threshold,
             },
+            "k_start_resolved": k_start,
             "mean": ds.mean,
             "scale": scale,
             "train_protein_ids": ds.train_protein_ids,

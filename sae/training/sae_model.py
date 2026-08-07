@@ -18,6 +18,21 @@ al.'s convention. Both are applied OUTSIDE this module (in data.py / train.py)
 so the same fixed mean/scale can be reused unchanged at inference time --
 this module only ever sees already-centered-and-scaled input.
 
+K-ANNEALING: train.py can optionally start training at a larger k than the
+final target and linearly decay it down over the first slice of training
+(see train.py's `--k-start`/`--k-anneal-frac`). Rationale: with a small,
+fixed k from step one, which features win the per-token top-k race is
+essentially random while w_enc is still near its random init, and a feature
+that loses that race early and keeps losing it never gets a gradient signal
+-- it's permanently dead before it had a chance to specialize into anything
+useful. Larger dictionaries (this codebase moved from d_hidden=4096 towards
+~10k for the vilip1 natural-binder generalization push) make this worse
+because there are more features competing for the same k slots per token.
+Starting with a larger k gives every feature early gradient signal, then
+annealing down to the target k forces the eventual sparse code without
+that early-training feature-death tax. This module only exposes the k
+override on `forward()`; the schedule itself lives in train.py.
+
 BatchTopK (Bussmann et al. 2024) was considered and deliberately rejected:
 our training corpus (~1.9M residues, one narrow protein-design domain) is
 too small/homogeneous for batch-relative adaptive sparsity to help, and it
@@ -90,12 +105,20 @@ class SparseAutoencoder(nn.Module):
     def dead_feature_mask(self) -> torch.Tensor:
         return self.tokens_since_fired > self.dead_tokens_threshold
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, Optional[torch.Tensor], int, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor, k: Optional[int] = None
+    ) -> tuple[torch.Tensor, Optional[torch.Tensor], int, torch.Tensor]:
         """x: (B, d_model) already centered+scaled. Returns (recon, auxk_recon
         or None, num_dead, latents) -- latents included so callers (e.g. the
-        validation loop's L0 metric) don't need a second encode() pass."""
+        validation loop's L0 metric) don't need a second encode() pass.
+
+        k: override for self.k, used by train.py's k-annealing schedule
+        (larger k early in training, decaying to self.k). Validation/encode
+        always use self.k (the target sparsity) regardless of this override,
+        so reported metrics stay comparable across epochs and to Biohub's
+        fixed k=64."""
         pre_acts = x @ self.w_enc + self.b_enc
-        latents = self.topk_activation(pre_acts, self.k)
+        latents = self.topk_activation(pre_acts, k if k is not None else self.k)
 
         if self.training:
             # Gated on train/eval mode -- a validation forward pass must not

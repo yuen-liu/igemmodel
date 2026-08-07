@@ -91,17 +91,28 @@ than assuming layer 23 is universally best.
 **3. Train a target-specific SAE** (only needs torch/numpy/pandas, no
 GPU-specific deps -- can run locally):
 ```
-python train.py --data-dir <target>_layer23_per_residue --output-dir checkpoints/<run>
+python train.py --data-dir <target>_layer23_per_residue --output-dir checkpoints/<run> \
+    --d-hidden 16384
 ```
 Architecture: per-token TopK (k=64, matching Biohub's sparsity so any
 benchmark isn't confounded by a different sparsification scheme), dictionary
-size sized to the target's own token budget (4096 for vilip1's ~1.94M
-tokens, vs. Biohub's 16,384 trained on ~1000x more general data), fixed
-dataset-level mean-centering (arXiv:2605.31518 -- prevents outlier-
-activation-dimension-induced dead features), AuxK auxiliary loss for
-dead-feature resurrection. Train/val split stratified per source so
-different design campaigns/length regimes stay proportionally represented
-in both splits.
+size originally set to the target's own token budget (4096 for vilip1's
+~1.94M tokens, vs. Biohub's 16,384 trained on ~1000x more general data) but
+since bumped to 16,384 to match Biohub's dict size directly -- a larger
+dictionary plus k-annealing (below) measurably improved natural-binder
+generalization FVE (0.42 -> 0.5157 in-house), fixed dataset-level
+mean-centering (arXiv:2605.31518 -- prevents outlier-activation-dimension-
+induced dead features), AuxK auxiliary loss for dead-feature resurrection.
+Train/val split stratified per source so different design campaigns/length
+regimes stay proportionally represented in both splits.
+
+K-annealing (`--k-start`/`--k-anneal-frac`, default k-start=4x target k
+decayed linearly over the first 20% of steps): starts training with a
+looser top-k so every feature gets early gradient signal, then tightens to
+the target k=64 -- see `sae_model.py`'s K-ANNEALING docstring. Matters more
+at larger dictionary sizes, where more features compete for the same k
+slots per token and a fixed small k from step one kills off more of them
+before they specialize.
 
 **4. Benchmark against Biohub's official general-purpose SAE** on identical
 held-out residues:
