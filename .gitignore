@@ -9,5 +9,10 @@ __pycache__/
 vilip1_layer23_per_residue/
 vilip1_layer23_sae_outputs/
 vilip1-20260728
+sae/checkpoints/
+sae/data-dir/
+sae/vilip1_layer23_65k_per_residue/
+sae/.venv/
+sae/results/
 REG3A_final_25_33/
 REG3A_final_45_57/
