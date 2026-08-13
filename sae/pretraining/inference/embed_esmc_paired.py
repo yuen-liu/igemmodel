@@ -121,6 +121,21 @@ def main() -> None:
         print("Smoke test passed (no crash, shapes look sane) -- not writing output.")
         return
 
+    # Probe hidden_dim from an actual forward pass rather than trusting a
+    # config attribute name -- ESMCConfig doesn't expose `hidden_size`
+    # (confirmed: AttributeError on a real run), same reasoning as
+    # embed_esmc.py's run_per_residue.
+    probe_encoded = tokenizer(df["sequence"].tolist()[:1], return_tensors="pt")
+    with torch.no_grad():
+        probe_out = model(
+            input_ids=probe_encoded["input_ids"].to(device),
+            attention_mask=probe_encoded["attention_mask"].to(device),
+            output_hidden_states=True,
+        )
+    hidden_dim = probe_out.hidden_states[0].shape[-1]
+    del probe_out
+    print(f"hidden_dim={hidden_dim} (probed from a real forward pass)")
+
     lengths = df["sequence"].str.len().to_numpy()
     offsets = np.concatenate([[0], np.cumsum(lengths)[:-1]])
     total_tokens = int(lengths.sum())
@@ -129,7 +144,7 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
     activations_path = args.output / "activations.npy"
     activations = np.lib.format.open_memmap(
-        activations_path, mode="w+", dtype=np.float16, shape=(total_tokens, model.config.hidden_size)
+        activations_path, mode="w+", dtype=np.float16, shape=(total_tokens, hidden_dim)
     )
 
     # Sort by BINDER length (the only thing that varies -- linker+target are
