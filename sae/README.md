@@ -19,6 +19,12 @@ mechanistic interpretability to become a universal accelerant for rational
 protein binder design, adaptable to any disease where early detection saves
 lives.
 
+**New to this repo and want to run the feature-labeling pipeline
+yourself?** See [`FEATURE_LABELING_SETUP.md`](FEATURE_LABELING_SETUP.md)
+for a step-by-step setup + run guide, including getting an Anthropic API
+key and setting a spend limit. This README covers what the pipeline does
+and why; that doc covers how to actually run it on your machine.
+
 This directory (`sae/`) is the interpretability framework itself: SAE
 training + benchmarking infrastructure for ESM-C-based binder embeddings.
 
@@ -54,8 +60,12 @@ sae/
     sae_model.py                # our SAE: per-token TopK (k=64), mean-centering, AuxK dead-feature revival
     train.py                    # trains our SAE, logs per-epoch metrics + checkpoints
     benchmark.py                 # ours vs. Biohub's official general-purpose SAE, on the same held-out residues
+    feature_analysis.py          # per-feature density + max-activating examples, linear probe vs. binding metrics
+    label_features.py            # LLM auto-labeling of features from their max-activating examples (optional, costs API $)
+    fetch_interpro.py            # InterPro domain/family annotations per example residue, via EBI's REST API (optional)
   analysis/
     sae_benchmark_analysis.ipynb   # training curves + benchmark comparison plots
+    sae_feature_analysis.ipynb     # feature density/interpretation plots + probe results, reads feature_analysis.py's output
 ```
 
 Data and outputs are gitignored (large/generated) and live locally / on the
@@ -135,6 +145,95 @@ token-specific.
 **5. Analyze**: plot training curves (loss/FVE/dead-feature-count vs. epoch)
 and the benchmark comparison.
 
+**6. Feature (semantic) analysis** -- what do the SAE's individual features
+mean, and are any of them predictive of binder quality?
+```
+python feature_analysis.py --checkpoint checkpoints/<run>/best.pt \
+    --data-dir <target>_layer23_per_residue --output-dir feature_analysis_results \
+    --probe-metrics-csv <per-campaign manifest with binding_confidence/iptm/ipsae/ipae> \
+    --probe-targets binding_confidence,iptm,ipsae,ipae
+```
+Encodes a stratified residue sample to find each feature's density (how
+often it fires) and top max-activating residues with local sequence
+context -- the standard SAE-interpretability recipe (Bricken et al. 2023,
+"Towards Monosemanticity"): read the contexts around a feature's hardest-
+firing residues to guess what it detects. Separately, pools per-residue
+codes into one vector per protein (max- and mean-pool) and runs a linear
+probe (per-feature Spearman correlation + nested-cross-validated Lasso)
+against binding-quality metrics the SAE never saw during training -- a
+feature that is both interpretable and predictive of binder quality is
+real evidence of a usable structural correlate, not just a reconstruction
+artifact. `sae_feature_analysis.ipynb` reads this script's output CSVs and
+cross-references the two (predictive features -> their max-activating
+contexts) for the actual biological read.
+
+**7. (Optional) LLM auto-labeling** -- have a cheap model draft a one-
+sentence description of each feature's pattern from its max-activating
+examples, instead of a human reading every leaderboard by hand:
+```
+python label_features.py --examples-csv feature_analysis_results/feature_top_examples.csv \
+    --output-dir feature_analysis_results \
+    --candidates-csv feature_analysis_results/probe_ipsae_max_multivariate.csv
+```
+Uses the Message Batches API (50% cheaper, appropriate for this bulk/non-
+interactive job) with Claude Haiku 4.5 -- ~$0.05 for the probe-selected
+candidate features, ~$3 for the full dictionary (4096 features). Requires
+`pip install anthropic` and API billing (**not** covered by a Claude.ai
+Pro/Max subscription -- that only covers claude.ai/Claude Code usage, not
+programmatic API calls). Every label is a hypothesis from sequence
+evidence alone, not a validated finding -- treat it the way you'd treat a
+human's first-pass guess reading the same table, and confirm anything that
+matters against structure before relying on it.
+
+**Known limitation, partially addressed**: sequence context alone can miss
+a feature whose real basis is structural (buried core, binder-target
+interface) -- see `fetch_interpro.py` below for one mitigation. Raw 3D
+structural context (secondary structure, solvent burial, coordinates) is
+still deferred: Boltz's predicted structures (already in this repo's
+`results/` directories, used by `compute_ipae.py`/`compute_ipsae.py` and
+the `esmc_embedding_analysis` notebooks' structural sanity checks) carry
+per-residue pLDDT and 3D coordinates that could add this, but (a) the
+`results/` directory layout is per-campaign and wasn't available to build
+against yet, and (b) raw coordinates are a poor fit for an LLM to reason
+about compared to symbolic annotations -- `fetch_interpro.py` was built
+instead, precisely to avoid needing an LLM to do spatial reasoning.
+
+**8. (Optional) InterPro domain/family annotations** -- `fetch_interpro.py`
+looks up each max-activating example's full protein via EBI's InterProScan5
+REST API and cross-references any hit's position range against the
+specific residue that fired the feature, so `label_features.py` can use a
+real domain/family call as evidence instead of guessing from sequence
+alone:
+```
+python fetch_interpro.py --examples-csv feature_analysis_results/feature_top_examples.csv \
+    --manifest manifest_combined.csv --output-dir feature_analysis_results \
+    --email you@example.com --candidates-csv feature_analysis_results/probe_ipsae_max_multivariate.csv
+
+python label_features.py --examples-csv feature_analysis_results/feature_top_examples.csv \
+    --output-dir feature_analysis_results \
+    --candidates-csv feature_analysis_results/probe_ipsae_max_multivariate.csv \
+    --interpro-csv feature_analysis_results/interpro_annotations.csv
+```
+**Expected coverage is sparse and that's not a bug**: this corpus is
+overwhelmingly de novo Boltz-designed binders, not evolved natural
+proteins. InterPro's member databases (Pfam, PROSITE, SMART, ...) are
+profile HMMs built from evolutionary conservation across natural
+homologs -- a de novo design has no evolutionary relationship to any
+characterized family even when it successfully mimics a natural fold, so
+most design-source examples are expected to come back with no hit.
+Coverage should concentrate on the `natural_binders`/`binder_dataset_vilip1`
+examples. `label_features.py`'s prompt is written to use an InterPro hit as
+strong evidence when present and fall back to sequence-context-only
+reasoning when absent, not to require a hit.
+
+No local InterProScan install needed -- this hits EBI's free public REST
+API directly (verified against the live service, not docs alone: one
+job per unique protein sequence, no true batch endpoint). Requires
+`pip install requests`, your own contact email (EBI's usage policy), and
+is sized for a few dozen candidate proteins (e.g. the linear probe's
+feature list), not the full ~25k-protein corpus -- each job takes several
+minutes and this is a shared, free research service, not a bulk API.
+
 ## vilip1 proof-of-pipeline results (50-epoch run)
 
 | | ours (dict=4096) | Biohub (dict=16384) |
@@ -155,13 +254,14 @@ applying to the actual clinical targets.
 - **Apply this same pipeline to UCH-L1, S100B, and B-FABP** -- the actual
   SENTINEL validation targets. Data/campaigns already exist for all three;
   this SAE pipeline does not yet touch them.
-- Linear probe: do either model's pooled per-protein sparse codes predict
-  binder-quality metrics (`binding_confidence`/`iptm`/`ipsae`/`ipae`)? Tests
-  whether features are functionally meaningful, not just good at
-  reconstruction -- the actual "steer design toward high-affinity binding"
-  piece of the SENTINEL mission.
-- Cross-check against the HDBSCAN clusters from the earlier
-  `esmc_embedding_analysis` clustering notebooks.
-- Feature interpretation for whatever comes out of the probe as most
-  predictive -- what residues/positions activate those features, and
-  whether they correspond to known binding-relevant motifs.
+- **Run `feature_analysis.py` against the real 65k checkpoint** (the linear
+  probe needs a per-campaign manifest with `binding_confidence`/`iptm`/
+  `ipsae`/`ipae` joined in -- see `notebooks/bridget/esmc_embedding_analysis/`
+  for how those get merged) and work through `sae_feature_analysis.ipynb`'s
+  output: which features (if any) predict binder quality, and do their
+  max-activating contexts correspond to legible structural motifs. The
+  tooling for this (density + max-activating examples + probe) exists as of
+  this commit but hasn't been run end-to-end on real data yet.
+- Cross-check predictive/interpretable features against the HDBSCAN clusters
+  from the earlier `esmc_embedding_analysis` clustering notebooks -- do SAE
+  features and cluster membership agree on what makes designs similar?
