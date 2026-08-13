@@ -86,7 +86,7 @@ class SparseAutoencoder(nn.Module):
 
         nn.init.kaiming_uniform_(self.w_enc, a=math.sqrt(5))
         self.w_dec.data = self.w_enc.data.T.clone()
-        self.w_dec.data /= self.w_dec.data.norm(dim=0)
+        self.w_dec.data /= self.w_dec.data.norm(dim=1, keepdim=True)
 
         # For each hidden dim, how many residues have been processed since it
         # last fired. Reset to 0 whenever a batch contains a nonzero
@@ -152,20 +152,26 @@ class SparseAutoencoder(nn.Module):
 
     @torch.no_grad()
     def norm_weights(self) -> None:
-        """Keep decoder columns unit-norm -- prevents the trivial trick of
-        shrinking codes and growing decoder norm to fake low reconstruction
-        loss. Call after each optimizer step."""
-        self.w_dec.data /= self.w_dec.data.norm(dim=0, keepdim=False)
+        """Keep each decoder feature (row) unit-norm -- prevents the trivial
+        trick of shrinking codes and growing decoder norm to fake low
+        reconstruction loss. Call after each optimizer step.
+
+        w_dec is (d_hidden, d_model): row i is feature i's decoder direction,
+        so the norm must be taken per row (dim=1) -- collapsing dim=0 instead
+        (an earlier bug here) normalizes per output activation dimension
+        across all features, not per feature, and doesn't prevent the trick
+        this is meant to prevent."""
+        self.w_dec.data /= self.w_dec.data.norm(dim=1, keepdim=True)
 
     @torch.no_grad()
     def norm_grad(self) -> None:
-        """Remove the gradient component parallel to each decoder column's
+        """Remove the gradient component parallel to each decoder feature's
         current direction, so norm_weights's renormalization doesn't fight
         the optimizer step. Call after loss.backward(), before optimizer.step()."""
         if self.w_dec.grad is None:
             return
-        dot_products = torch.sum(self.w_dec.data * self.w_dec.grad, dim=0)
-        self.w_dec.grad.sub_(self.w_dec.data * dot_products.unsqueeze(0))
+        dot_products = torch.sum(self.w_dec.data * self.w_dec.grad, dim=1, keepdim=True)
+        self.w_dec.grad.sub_(self.w_dec.data * dot_products)
 
 
 def loss_fn(
