@@ -36,8 +36,14 @@ import pandas as pd
 import torch
 
 # Sources held out entirely from train/val -- real UniProt proteins used
-# only for qualitative eval (see module docstring), never trained on.
+# only for qualitative eval (see module docstring), never trained on by
+# default. `natural_binders` (13 hand-picked) is NEVER trained on regardless
+# of `natural_train_frac` below -- it's the more curated/trustworthy eval
+# signal. `binder_dataset_vilip1` (69 STRING-derived) can be partially
+# folded into training via `load_dataset`'s `natural_train_frac`.
 EVAL_ONLY_SOURCES = {"natural_binders", "binder_dataset_vilip1"}
+ALWAYS_EVAL_ONLY_SOURCES = {"natural_binders"}
+NATURAL_PARTIAL_SOURCE = "binder_dataset_vilip1"
 
 
 @dataclass
@@ -53,17 +59,27 @@ class SAEDataset:
 
 
 def _stratified_protein_split(
-    design_df: pd.DataFrame, val_fraction: float, seed: int
+    design_df: pd.DataFrame,
+    val_fraction: float,
+    seed: int,
+    val_fraction_overrides: dict[str, float] | None = None,
 ) -> tuple[set, set]:
     """Returns (train_ids, val_ids) sets of protein ids, split independently
-    within each `source` group so both splits keep the same source mix."""
+    within each `source` group so both splits keep the same source mix.
+
+    val_fraction_overrides: per-source val fraction, falling back to
+    `val_fraction` for any source not listed -- used by `load_dataset` to
+    hold `binder_dataset_vilip1` out at a different rate than design
+    sources when mixing natural binders into training."""
+    val_fraction_overrides = val_fraction_overrides or {}
     rng = np.random.RandomState(seed)
     train_ids, val_ids = set(), set()
     for source in sorted(design_df["source"].unique()):
+        frac = val_fraction_overrides.get(source, val_fraction)
         ids = design_df.loc[design_df["source"] == source, "id"].to_numpy()
         perm = rng.permutation(len(ids))
         shuffled = ids[perm]
-        n_val = int(round(len(ids) * val_fraction))
+        n_val = int(round(len(ids) * frac))
         val_ids.update(shuffled[:n_val].tolist())
         train_ids.update(shuffled[n_val:].tolist())
     return train_ids, val_ids
@@ -81,7 +97,14 @@ def _expand_to_residue_indices(rows: pd.DataFrame) -> tuple[np.ndarray, np.ndarr
     return np.concatenate(idx_parts), np.concatenate(source_parts)
 
 
-def load_dataset(data_dir: Path, val_fraction: float = 0.1, seed: int = 0) -> SAEDataset:
+def load_dataset(
+    data_dir: Path, val_fraction: float = 0.1, seed: int = 0, natural_train_frac: float = 0.0
+) -> SAEDataset:
+    """natural_train_frac: fraction of `binder_dataset_vilip1` (69
+    STRING-derived natural sequences) to fold into training, holding the
+    rest out for eval alongside `natural_binders` (13 hand-picked, always
+    100% held out regardless of this value). 0.0 (default) preserves the
+    original behavior: both natural sources held out entirely."""
     data_dir = Path(data_dir)
     index_df = pd.read_csv(data_dir / "index.csv")
     manifest_df = pd.read_csv(data_dir / "manifest_combined.csv")[["id", "source"]]
@@ -89,14 +112,27 @@ def load_dataset(data_dir: Path, val_fraction: float = 0.1, seed: int = 0) -> SA
     merged = index_df.merge(manifest_df, on="id", how="left")
     assert merged["source"].notna().all(), "some index.csv ids missing from manifest_combined.csv"
 
-    design_df = merged[~merged["source"].isin(EVAL_ONLY_SOURCES)].reset_index(drop=True)
+    excluded_sources = set(ALWAYS_EVAL_ONLY_SOURCES)
+    if natural_train_frac <= 0:
+        excluded_sources |= {NATURAL_PARTIAL_SOURCE}
+    design_df = merged[~merged["source"].isin(excluded_sources)].reset_index(drop=True)
     print(
-        f"{len(design_df)}/{len(merged)} proteins are designs (excluding "
-        f"{len(merged) - len(design_df)} eval-only proteins from {EVAL_ONLY_SOURCES}, "
+        f"{len(design_df)}/{len(merged)} proteins go into the train/val split (excluding "
+        f"{len(merged) - len(design_df)} eval-only proteins from {excluded_sources}, "
         "held out for eval only)"
     )
+    if natural_train_frac > 0:
+        print(
+            f"natural_train_frac={natural_train_frac}: {NATURAL_PARTIAL_SOURCE} is IN the "
+            "split below at that train rate, NOT fully held out -- eval-only natural FVE "
+            "numbers from this run aren't apples-to-apples with runs using the default 0.0"
+        )
 
-    train_ids, val_ids = _stratified_protein_split(design_df, val_fraction, seed)
+    val_fraction_overrides = {}
+    if natural_train_frac > 0:
+        val_fraction_overrides[NATURAL_PARTIAL_SOURCE] = 1.0 - natural_train_frac
+
+    train_ids, val_ids = _stratified_protein_split(design_df, val_fraction, seed, val_fraction_overrides)
     train_rows = design_df[design_df["id"].isin(train_ids)]
     val_rows = design_df[design_df["id"].isin(val_ids)]
     assert set(train_rows["id"]).isdisjoint(set(val_rows["id"]))

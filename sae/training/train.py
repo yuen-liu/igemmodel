@@ -101,6 +101,16 @@ def main() -> None:
     parser.add_argument("--warmup-frac", type=float, default=0.05)
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--val-fraction", type=float, default=0.1)
+    parser.add_argument(
+        "--natural-train-frac",
+        type=float,
+        default=0.0,
+        help="Fraction of the 69 STRING-derived natural sequences "
+        "(data.NATURAL_PARTIAL_SOURCE) to fold into training instead of "
+        "holding out entirely. The 13 hand-picked natural_binders sequences "
+        "are always 100%% held out regardless. Default 0.0 preserves the "
+        "original all-held-out behavior. See data.py's load_dataset docstring.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--log-every", type=int, default=50)
     args = parser.parse_args()
@@ -111,7 +121,12 @@ def main() -> None:
     if device.type != "cuda":
         print("WARNING: no CUDA device found, falling back to CPU (will be slow)")
 
-    ds = load_dataset(args.data_dir, val_fraction=args.val_fraction, seed=args.seed)
+    ds = load_dataset(
+        args.data_dir,
+        val_fraction=args.val_fraction,
+        seed=args.seed,
+        natural_train_frac=args.natural_train_frac,
+    )
     d_model = ds.train_x.shape[1]
     mean = ds.mean.to(device)
     scale = ds.scale

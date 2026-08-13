@@ -176,7 +176,13 @@ def main():
     manifest = pd.read_csv(args.manifest)
     val_ids = set(ckpt["val_protein_ids"].tolist())
     val_rows = manifest[manifest["id"].isin(val_ids)]
-    natural_rows = manifest[manifest["source"].isin(EVAL_ONLY_SOURCES)]
+    # Excludes anything actually trained on -- when the checkpoint was
+    # trained with --natural-train-frac > 0, some EVAL_ONLY_SOURCES rows
+    # (binder_dataset_vilip1) are in ckpt["train_protein_ids"], not held
+    # out; including them here would leak trained-on sequences into the
+    # "eval" FVE. No-op when natural_train_frac was 0 (the default).
+    trained_ids = set(ckpt["train_protein_ids"].tolist())
+    natural_rows = manifest[manifest["source"].isin(EVAL_ONLY_SOURCES) & ~manifest["id"].isin(trained_ids)]
 
     print(f"Loading {BIOHUB_MODEL} + official SAE hook at layer {LAYER}...")
     model = AutoModel.from_pretrained(BIOHUB_MODEL, device_map="auto").eval()
