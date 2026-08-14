@@ -23,6 +23,10 @@ REG3A_final_45_57/
 checkpoints_65k*/
 benchmark_results*/
 feature_analysis_*/
+!feature_analysis_run4/
+!feature_analysis_run4/*.csv
+!feature_analysis_paired/
+!feature_analysis_paired/*.csv
 vilip1_*_output/
 vilip1_*_per_residue/
 vilip1_*_per_residue.zip

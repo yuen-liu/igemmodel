@@ -1,0 +1,14 @@
+feature,label,error
+233,"The activating residues are predominantly basic (K/R) or acidic (E/Q) amino acids, most strongly activated when positioned immediately following a conserved ""LSE"" or ""LSEE"" motif in the preceding context.",
+1707,"No clear pattern.
+
+The activating residues are highly diverse (S, E, A, Y, G, F, D, I, T, V) with no dominant amino acid identity, and the InterPro annotations are scattered across multiple unrelated domains with no single annotation covering more than 20% of examples, indicating no consistent functional or structural motif.",
+2214,All 15 examples are annotated as GH_hydrolase_sf (Glycoside Hydrolase superfamily) at the activated residue positions.,
+4657,"Serine residues preceded by acidic residues (D or E) and followed by acidic or polar residues, with strong enrichment in RTN1-4 and CAPS protein family annotations.",
+6073,"Leucine residues preceded by acidic amino acids (aspartate or glutamate) are the dominant activators of this feature, as seen in examples 2-4 where [L] follows ""DEE"" or similar acidic-rich contexts, with leucine accounting for 6 of the top 12 activations.",
+6869,"Glycine residues immediately preceding a lysine (G-K motif), predominantly found in nucleotide-binding domains including P-loop NTPases and GTPases.",
+10586,"The feature preferentially activates on hydrophobic residues (G, L, F, I, W) in locally hydrophobic sequence contexts, with a secondary association to ionotropic glutamate receptor domains.",
+11326,"The feature activates most strongly on basic residues (R, K) and Pro (P), with a secondary preference for small residues (A, N, I), positioned immediately before acidic residues (D, E, G) or Pro-rich motifs.",
+12588,"The feature activates on residues within the MUN domain (IPR010439), as indicated by this annotation appearing in 10 of 15 examples at the exact position of activation.",
+12918,"The feature activates on phenylalanine (F) residues in the conserved motif ""TGLQG[F]L"" within the tubulin GTPase domain, as evidenced by the top 5 examples all showing this pattern and the InterPro annotations indicating Tubulin_FtsZ_GTPase domain matches in 8/15 examples.",
+14247,"The feature strongly activates on hydrophobic residues (I, L, F) predominantly in positions flanked by small or polar residues, with no single InterPro domain showing dominant annotation.",

@@ -1,0 +1,16 @@
+feature,label,error
+582,"The feature activates on hydrophobic residues (I, L, F, V) and alanine, with no clear single InterPro domain pattern, suggesting this feature detects hydrophobic residues broadly rather than a specific functional motif.",
+3896,"This feature activates on residues within a specific conserved sequence motif (GLGDFIFYSVLVGK) that is part of the Peptidase_A22A domain, with strongest activation on hydrophobic residues (L, V, F, Y, I) and moderate activation on small/polar residues (S, G, K, A) within this domain.",
+5710,"The feature activates on prolines (P) and basic residues (K/R), with proline being the dominant activating residue (6/15 examples are P), and InterPro evidence strongly associates these positions with tubulin/GTPase domains (Tubulin_FtsZ_GTPase and Alpha_tubulin together account for 10/15 annotated examples).",
+5997,"No clear pattern.
+
+While the residues show some preference for hydrophobic amino acids (G, F, I, L, V, M, E, D) and occasional polar residues (T, S, Q, N), there is no consistent single residue identity or motif. The InterPro annotations are highly scattered across seven different domain families with no single annotation dominating (the highest coverage is only 3/15 examples for three different domains), indicating these matches are distributed across unrelated protein contexts rather than reflecting a unified structural or functional pattern.",
+9725,"No clear pattern.
+
+The residues show no consistent amino acid identity (ranging across S, Y, E, G, A, I, T, R, F, L, P), no obvious local motif, and the InterPro annotations are scattered with no single domain dominating—ARM-like appears in only 3/15 examples, insufficient to establish a verified pattern. The feature activates on diverse sequence contexts without a discernible unifying structural or sequence characteristic.",
+11047,"The activating residues are predominantly hydrophobic amino acids (L, F, C, A, M, I, V) appearing in diverse sequence contexts with no dominant InterPro annotation, suggesting the feature detects hydrophobic residues in variable local environments.",
+11213,"Isoleucine or leucine residues immediately preceding a glutamine, with a strong preference for hydrophobic residues (I/L) at the feature position followed by Q in the next position.",
+11813,"Residues preceded by acidic (D/E) or small hydrophobic (A/G) residues, with a slight preference for proline and acidic amino acids in the activated position itself.",
+12110,"The feature activates on serine (S) residues, particularly those positioned immediately before or within acidic-rich regions (containing aspartate D and/or glutamate E).",
+12588,"The feature strongly activates on residues within the MUN domain (IPR010439), as evidenced by 13 of 15 examples matching this InterPro annotation at the exact activating residue position.",
+15482,"Leucine (L) or hydrophobic residues (L/I/V) at positions within Armadillo domain-containing proteins, with strong enrichment for Armadillo family annotations (IPR000225) covering 80% of examples.",

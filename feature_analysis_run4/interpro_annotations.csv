@@ -1,0 +1,166 @@
+feature,rank,protein_id,position,interpro_annotation
+233,0,pres_Cm1wjoB1ibiJCnTYKAI3,36,
+233,1,pres_86UEJWAi25fWvHmaF691,31,
+233,2,pres_GffoS6D9LUCznZRDx2ZU,40,
+233,3,pres_V6rbVNaCr6aaqDfDKlqN,48,
+233,4,pres_wtppVEWEbGJ7AqtMMcdh,24,
+233,5,pres_fX7N2yToMpskAl4RIlu5,49,
+233,6,pres_pB8ksrbuvxBMvBZVAhDI,45,
+233,7,pres_GA81mVuMB7BqIzA3fFn6,18,
+233,8,pres_IQ1I3LDlHFksr4ABtut4,28,
+233,9,pres_uV0aIlursIfg49jP6NKe,7,
+233,10,pres_XnWXgLqF4vNXhWB9Jpjj,38,
+233,11,pres_2qpUr3inzTYKlBXkjMOP,30,
+233,12,pres_lS9pBRvJAUnPG8JZWCAE,33,
+233,13,pres_yrdBEwNpHo23TBCSY3XU,17,
+233,14,pres_zHGgO52RShzEPfQk0pTh,8,
+1707,0,pres_UZJNvRzBCZxzyxex6Dk3,26,ARM-like (IPR011989)
+1707,1,pres_sy9QKBQeyYRz1U9e1oAB,43,
+1707,2,evalbinder_P05067,445,Amyloid_glyco (IPR008155)
+1707,3,evalbinder_Q96KV7,1501,Beta-prop_WDR90_4th (IPR055440)
+1707,4,evalbinder_O75899,20,
+1707,5,evalbinder_O75899,10,
+1707,6,pres_Pav1HtFIz9ERy3aBrxPw,114,ARM-like (IPR011989)
+1707,7,pres_6jOvTKt1gSMNqAjrs2DM,56,ARM-like (IPR011989)
+1707,8,evalbinder_Q96KV7,760,WD_repeat_EMAP (IPR050630)
+1707,9,evalbinder_Q96KV7,1543,Beta-prop_WDR90_4th (IPR055440)
+1707,10,evalbinder_Q8NCB2,81,Prot_kinase_dom (IPR000719)
+1707,11,pres_NqwB16p7AlKM6ZTDCdRi,9,
+1707,12,pres_YOFNLHIuiiO1HyzJGIua,116,ARM-type_fold (IPR016024)
+1707,13,pres_JrspHSQMW1wn87BjTLhC,86,ARM-type_fold (IPR016024)
+1707,14,evalbinder_P07196,264,IF_rod_dom (IPR039008)
+2214,0,evalbinder_P36222,375,GH_hydrolase_sf (IPR017853)
+2214,1,evalbinder_P36222,371,GH_hydrolase_sf (IPR017853)
+2214,2,evalbinder_P36222,372,GH_hydrolase_sf (IPR017853)
+2214,3,evalbinder_P36222,367,GH_hydrolase_sf (IPR017853)
+2214,4,evalbinder_P36222,366,GH_hydrolase_sf (IPR017853)
+2214,5,evalbinder_P36222,374,GH_hydrolase_sf (IPR017853)
+2214,6,evalbinder_P36222,369,GH_hydrolase_sf (IPR017853)
+2214,7,evalbinder_P36222,368,GH_hydrolase_sf (IPR017853)
+2214,8,evalbinder_P36222,365,GH_hydrolase_sf (IPR017853)
+2214,9,evalbinder_P36222,370,GH_hydrolase_sf (IPR017853)
+2214,10,evalbinder_P36222,364,GH_hydrolase_sf (IPR017853)
+2214,11,evalbinder_P36222,373,GH_hydrolase_sf (IPR017853)
+2214,12,evalbinder_P36222,376,GH_hydrolase_sf (IPR017853)
+2214,13,evalbinder_P36222,378,GH_hydrolase_sf (IPR017853)
+2214,14,evalbinder_P36222,362,GH_hydrolase_sf (IPR017853)
+4657,0,evalbinder_Q9ULU8,6,CAPS (IPR033227)
+4657,1,evalbinder_Q9ULU8,1344,CAPS (IPR033227)
+4657,2,evalbinder_Q9ULU8,5,CAPS (IPR033227)
+4657,3,evalbinder_Q9ULU8,4,CAPS (IPR033227)
+4657,4,evalbinder_P49810,6,Pept_A22A_PS2 (IPR001493)
+4657,5,evalbinder_P49810,8,Pept_A22A_PS2 (IPR001493)
+4657,6,evalbinder_Q9ULU8,10,CAPS (IPR033227)
+4657,7,evalbinder_Q16799,407,RTN1-4 (IPR046964)
+4657,8,evalbinder_Q16799,410,RTN1-4 (IPR046964)
+4657,9,evalbinder_Q16799,403,RTN1-4 (IPR046964)
+4657,10,evalbinder_O15083,64,
+4657,11,evalbinder_Q16799,474,RTN1-4 (IPR046964)
+4657,12,evalbinder_Q16799,473,RTN1-4 (IPR046964)
+4657,13,Q96AQ9,167,FAM131 (IPR026782)
+4657,14,evalbinder_Q16799,404,RTN1-4 (IPR046964)
+6073,0,evalbinder_Q9ULV0,677,Myosin_head_motor_dom-like (IPR001609)
+6073,1,evalbinder_Q9NSA2,117,T1-type_BTB (IPR003131)
+6073,2,evalbinder_Q9NZV8,118,SKP1/BTB/POZ_sf (IPR011333)
+6073,3,evalbinder_P48547,90,VG_K_chnl (IPR028325)
+6073,4,evalbinder_Q8N442,110,EF-4 (IPR006297)
+6073,5,evalbinder_Q9ULV0,361,Myosin_head_motor_dom-like (IPR001609)
+6073,6,evalbinder_P09104,122,Enolase_N (IPR020811)
+6073,7,evalbinder_Q9ULV0,311,Myosin_head_motor_dom-like (IPR001609)
+6073,8,evalbinder_Q8N442,88,EF-4 (IPR006297)
+6073,9,evalbinder_P39656,141,OST48_N (IPR055457)
+6073,10,evalbinder_Q9P241,736,ATPase_P-typ_cyto_dom_N (IPR023299)
+6073,11,evalbinder_Q9P241,1174,P-type_ATPase_IV (IPR006539)
+6073,12,evalbinder_Q93050,236,V-type_ATPase_116kDa_su_euka (IPR026028)
+6073,13,evalbinder_P56817,200,Aspartic_peptidase_A1 (IPR001461)
+6073,14,evalbinder_P36222,243,Chitinase_II/V-like_cat (IPR011583)
+6869,0,evalbinder_Q8N442,79,T_Tr_GTP-bd_dom (IPR000795)
+6869,1,evalbinder_P84077,28,Arf1-5-like (IPR045872)
+6869,2,evalbinder_P19086,44,Gprotein_alpha_su (IPR001019)
+6869,3,evalbinder_O95057,18,Small_GTP-bd (IPR005225)
+6869,4,evalbinder_Q16854,49,P-loop_NTPase (IPR027417)
+6869,5,evalbinder_P38606,254,P-loop_NTPase (IPR027417)
+6869,6,Q86TD4,104,G_DYNAMIN_dom (IPR030381)
+6869,7,evalbinder_Q9ULV0,167,Myosin_head_motor_dom-like (IPR001609)
+6869,8,evalbinder_O14936,750,P-loop_NTPase (IPR027417)
+6869,9,P54253,813,
+6869,10,evalbinder_O14936,18,Prot_kinase_dom (IPR000719)
+6869,11,evalbinder_Q8N442,142,T_Tr_GTP-bd_dom (IPR000795)
+6869,12,evalbinder_O14936,265,Prot_kinase_dom (IPR000719)
+6869,13,evalbinder_Q8NCB2,275,Prot_kinase_dom (IPR000719)
+6869,14,evalbinder_P78413,165,HD (IPR001356)
+10586,0,evalbinder_P49810,364,Peptidase_A22A (IPR001108)
+10586,1,evalbinder_Q9P241,1153,P-type_ATPase_IV (IPR006539)
+10586,2,evalbinder_Q16720,888,ATPase_P-typ_cation-transptr_C (IPR006068)
+10586,3,evalbinder_P49810,366,Peptidase_A22A (IPR001108)
+10586,4,evalbinder_P49810,367,Peptidase_A22A (IPR001108)
+10586,5,evalbinder_P49810,365,Peptidase_A22A (IPR001108)
+10586,6,evalbinder_P49810,368,Peptidase_A22A (IPR001108)
+10586,7,evalbinder_Q13002,803,Ionotropic_Glu_rcpt (IPR015683)
+10586,8,evalbinder_Q13002,802,Ionotropic_Glu_rcpt (IPR015683)
+10586,9,evalbinder_P39656,267,OST48_N (IPR055457)
+10586,10,evalbinder_Q13002,805,Ionotropic_Glu_rcpt (IPR015683)
+10586,11,evalbinder_Q13002,801,Ionotropic_Glu_rcpt (IPR015683)
+10586,12,evalbinder_Q13002,804,Ionotropic_Glu_rcpt (IPR015683)
+10586,13,evalbinder_Q93050,517,V-type_ATPase_116kDa_su_euka (IPR026028)
+10586,14,evalbinder_Q13002,798,Ionotropic_Glu_rcpt (IPR015683)
+11326,0,Q03692,471,Collagen (IPR008160)
+11326,1,pres_lOlMXBYsrYpgXCoiziuG,16,
+11326,2,pres_rXqKBDbWshrCBH8JoHxz,125,
+11326,3,pres_GOTEVfHiVUjxkCl7CfDW,14,
+11326,4,Q03692,61,
+11326,5,pres_bmRFs0mK2aOOAQiLGScM,114,
+11326,6,pres_ywDbIov5zYhAGCVTDZcG,58,
+11326,7,pres_ghNPK50eXtVXMFbv8a7N,35,
+11326,8,pres_hww6sHCcsBDz28cDFYDn,47,Ig-like_dom_sf (IPR036179)
+11326,9,pres_X2lQPzAzM8BCp4qnMTqy,118,
+11326,10,Q03692,96,
+11326,11,pres_GIvFWCgl0HELEXNa36HR,109,
+11326,12,pres_eW3vZGBczjUD19hWnRmu,34,
+11326,13,pres_3F5aGF9rZaZW4VHbaYtJ,13,
+11326,14,pres_qhnlChEmkyxFq5axO2US,79,
+12588,0,evalbinder_Q9ULV0,1715,Myo5b_CBD (IPR037990)
+12588,1,evalbinder_Q9ULU8,1289,MUN_dom (IPR010439)
+12588,2,evalbinder_Q9ULV0,1552,Myo5b_CBD (IPR037990)
+12588,3,evalbinder_Q9ULU8,1140,MUN_dom (IPR010439)
+12588,4,evalbinder_Q9ULU8,1143,MUN_dom (IPR010439)
+12588,5,evalbinder_Q9ULU8,1136,MUN_dom (IPR010439)
+12588,6,evalbinder_Q9ULU8,885,MUN_dom (IPR010439)
+12588,7,evalbinder_Q9ULU8,459,CAPS (IPR033227)
+12588,8,evalbinder_P21579,226,C2_domain_sf (IPR035892)
+12588,9,evalbinder_Q9ULU8,1208,MUN_dom (IPR010439)
+12588,10,evalbinder_Q9ULU8,956,MUN_dom (IPR010439)
+12588,11,evalbinder_P21579,359,C2_domain_sf (IPR035892)
+12588,12,evalbinder_Q9ULU8,953,MUN_dom (IPR010439)
+12588,13,evalbinder_Q9ULU8,1292,MUN_dom (IPR010439)
+12588,14,evalbinder_Q9ULU8,881,MUN_dom (IPR010439)
+12918,0,evalbinder_A6NHL2,141,Tubulin (IPR000217)
+12918,1,evalbinder_P68366,134,Tubulin_FtsZ_GTPase (IPR003008)
+12918,2,evalbinder_F5H5D3,204,Tubulin_FtsZ_GTPase (IPR003008)
+12918,3,evalbinder_Q9NY65,134,Tubulin_FtsZ_GTPase (IPR003008)
+12918,4,evalbinder_P0DPH7,134,Tubulin (IPR000217)
+12918,5,evalbinder_F5H5D3,244,Tubulin_FtsZ_GTPase (IPR003008)
+12918,6,evalbinder_P68366,162,Alpha_tubulin (IPR002452)
+12918,7,evalbinder_F5H5D3,232,Alpha_tubulin (IPR002452)
+12918,8,evalbinder_P0DPH7,162,Tubulin (IPR000217)
+12918,9,evalbinder_P0DPH7,174,Tubulin/FtsZ_GTPase_sf (IPR036525)
+12918,10,evalbinder_Q9NY65,162,Tubulin_FtsZ_GTPase (IPR003008)
+12918,11,evalbinder_P68366,174,Tubulin_FtsZ_GTPase (IPR003008)
+12918,12,evalbinder_Q9NY65,174,Tubulin_FtsZ_GTPase (IPR003008)
+12918,13,evalbinder_Q9NY65,183,Tubulin_FtsZ_GTPase (IPR003008)
+12918,14,evalbinder_A6NHL2,169,Alpha_tubulin (IPR002452)
+14247,0,evalbinder_Q9ULV0,1715,Myo5b_CBD (IPR037990)
+14247,1,evalbinder_Q15078,229,CDK5_activator (IPR004944)
+14247,2,evalbinder_Q53HL2,42,Borealin_N (IPR018851)
+14247,3,evalbinder_Q9UD71,10,PPP1R1A/B/C (IPR008466)
+14247,4,evalbinder_Q93050,802,V-type_ATPase_116kDa_su_euka (IPR026028)
+14247,5,evalbinder_Q9ULV0,677,Myosin_head_motor_dom-like (IPR001609)
+14247,6,O43610,229,Sprouty (IPR007875)
+14247,7,evalbinder_Q9P241,442,ATPase_P-typ_P_site (IPR018303)
+14247,8,evalbinder_Q9NSA2,195,VG_K_chnl (IPR028325)
+14247,9,Q7Z699,411,Sprouty (IPR007875)
+14247,10,Q7Z698,385,Sprouty (IPR007875)
+14247,11,evalbinder_P05067,445,Amyloid_glyco (IPR008155)
+14247,12,evalbinder_Q9ULV0,1552,Myo5b_CBD (IPR037990)
+14247,13,evalbinder_Q9NZV8,194,Volt_channel_dom_sf (IPR027359)
+14247,14,Q86UW9,561,Deltex_C (IPR039396)
