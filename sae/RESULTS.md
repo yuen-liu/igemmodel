@@ -117,8 +117,23 @@ scp'd down from Waluigi's `~/analysis/`) each have `feature_stats.csv` +
   (370-374 in evalbinder_P49810) all in `Peptidase_A22A (IPR001108)`. Full
   results + methodology in
   `sae/analysis/sae_feature_analysis_run4_vs_paired.ipynb`.
-- Not yet done: LLM auto-labeling (`label_features.py`) on this same
-  feature set -- optional next step, needs an Anthropic API key set up
-  per `FEATURE_LABELING_SETUP.md` step 5.
+- **LLM auto-labeling done** (`label_features.py`, Claude Haiku 4.5 via
+  Message Batches API, same 11-feature subset per checkpoint, InterPro
+  evidence included). Well-calibrated: correctly returns "No clear
+  pattern" when InterPro evidence is genuinely scattered (run4 feature
+  1707; run_paired features 5997/9725) rather than forcing a story, and
+  gives specific, confident labels when evidence is strong (run4 feature
+  2214: "all 15 examples GH_hydrolase_sf"; feature 12918: tubulin/FtsZ
+  GTPase domain + a specific recurring motif `TGLQG[F]L`).
+- **Checked the shared-`--seed 0` confound on the cross-dictionary
+  consistency finding**: both run4 and run_paired used the same default
+  seed (identical weight init), so checked whether the SAME feature
+  *index* is the hotspot representative in both dictionaries more than
+  chance would predict. Only 1/6 hotspots share an index; the other 5 are
+  detected by genuinely different features per dictionary -- the
+  consistency finding is NOT mainly a seed artifact, a stronger result
+  than assumed going in.
 - **Probe (`cv_r2`) not run** -- see the "linear probe deprioritized"
   note above. Co-attention question still open.
+- Full methodology + reproducible cells:
+  `sae/analysis/sae_feature_analysis_run4_vs_paired.ipynb`.
