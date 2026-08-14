@@ -76,13 +76,35 @@ rather than actually fitting), or just accept a much smaller/faster probe
 (fewer alphas, fewer CV folds -- both hardcoded in `feature_analysis.py`,
 not exposed via CLI) rather than skipping it entirely.
 
-## Feature analysis results (fill in as they land)
+## Feature analysis results
 
-- `feature_analysis_run4/`: probe of run4's pooled codes against
-  `binding_confidence`/`iptm`/`ipsae` (no `ipae` data available -- not
-  computed for any vilip1 campaign on Waluigi as of this session; `ipsae`
-  only available for the `vilip1_full20k` subset, 20k/65k designs).
-  cv_r2 per target/pooling: TBD.
-- `feature_analysis_paired/`: same probe, run_paired's codes. cv_r2 per
-  target/pooling: TBD. **This vs. the row above is the direct answer to
-  the co-attention question.**
+**Qualitative pass done (2026-08-14), probe not run (see note above).**
+`feature_analysis_run4/` and `feature_analysis_paired/` (local repo root,
+scp'd down from Waluigi's `~/analysis/`) each have `feature_stats.csv` +
+`feature_top_examples.csv` from `feature_analysis.py` without
+`--probe-metrics-csv`.
+
+- Both dictionaries healthy: 18/16384 dead (run4), 31/16384 dead (paired),
+  both <0.2%. Similar density distributions (median ~0.0016-0.0018) and
+  activation-magnitude distributions between the two.
+- **Cross-dictionary consistency check**: took the top 30 highest-density
+  (most generic) features in each of run4/run_paired, looked at each
+  one's single hardest-firing residue (protein id + position). 6 of ~28-30
+  landed on the EXACT same (protein, position) in both -- independently
+  trained SAEs, different training data (binder-alone vs. binder+target),
+  converging on the same residues by chance across millions of candidate
+  residues would be essentially impossible. Real, non-artifactual signal.
+  Several of the overlapping hits are on real natural-protein ids
+  (Q9ULV0, Q9ULU8, Q03692, P49810), not just synthetic designs -- the
+  shared signal isn't a design-campaign-specific artifact.
+- Single most generic feature in BOTH dictionaries peaks at the same
+  residue: `binder_dataset_vilip1`, position 1715, context
+  `MQLRYN[I]SQLEEW` (run4 feature 14247, density=0.7646; paired feature
+  582, density=0.7631).
+- Not yet done: reading through more of `feature_top_examples.csv` for an
+  actual biological interpretation of what these convergent features
+  detect (motif? secondary structure position? something else) --
+  candidate next step, doesn't need the cluster, can be done locally from
+  the scp'd CSVs.
+- **Probe (`cv_r2`) not run** -- see the "linear probe deprioritized"
+  note above. Co-attention question still open.
