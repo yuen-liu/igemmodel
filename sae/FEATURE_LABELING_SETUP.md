@@ -240,6 +240,17 @@ plausible but the underlying evidence is scattered.
 | `interpro_annotations.csv` | InterPro hit (if any) per example, at that exact residue position |
 | `feature_labels.csv` | final LLM-drafted one-sentence label per feature |
 
+**If you ran with `--probe-metrics-csv`** (see `README.md`'s step 6 -- not
+covered by this doc's own walkthrough above, which omits that flag), you
+also get one set of these per target x pooling-method combination (e.g.
+`probe_binding_confidence_max_summary.json`):
+
+| File | What it is |
+|---|---|
+| `probe_<target>_<pool>_univariate.csv` | per-feature Spearman correlation vs. that target |
+| `probe_<target>_<pool>_multivariate.csv` | nonzero Lasso coefficients vs. that target |
+| `probe_<target>_<pool>_summary.json` | `cross_validated_r2` (the honest, nested-CV R²) plus `n_proteins`/`cv_folds`/`lasso_alpha` |
+
 ## Troubleshooting
 
 - **`python3: can't open file '.../label_features.py'`** -- you're not in
