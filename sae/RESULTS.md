@@ -60,6 +60,22 @@ checkpoint for feature analysis** (Vignesh's `feature_analysis.py`) --
 tied with run6 on the metric that matters, simpler/cheaper, and analysis
 tooling was already built around it.
 
+**2026-08-14, ~1am: linear probe deprioritized for time.** Even after
+parallelizing `LassoCV` (`n_jobs=-1`, commit `aaa6b3c`) across 48 cores, it
+was still too slow to finish before the submission deadline allowed for --
+switched to just the qualitative pass (`feature_analysis.py` without
+`--probe-metrics-csv`: `feature_stats.csv` + `feature_top_examples.csv`,
+under a minute). This means: no `cv_r2` numbers, and **the co-attention
+question (does `run_paired` predict binding affinity better than
+binder-alone) is NOT answered** -- that was the probe's job specifically,
+nothing else in the pipeline tests it. If there's time before the actual
+submission, revisit: profile why the parallel version was still slow
+(worth checking whether joblib's process-based parallelism was spending
+most of its time re-serializing the ~850MB pooled-code matrix to workers
+rather than actually fitting), or just accept a much smaller/faster probe
+(fewer alphas, fewer CV folds -- both hardcoded in `feature_analysis.py`,
+not exposed via CLI) rather than skipping it entirely.
+
 ## Feature analysis results (fill in as they land)
 
 - `feature_analysis_run4/`: probe of run4's pooled codes against
