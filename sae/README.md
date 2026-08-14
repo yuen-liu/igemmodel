@@ -167,6 +167,17 @@ artifact. `sae_feature_analysis.ipynb` reads this script's output CSVs and
 cross-references the two (predictive features -> their max-activating
 contexts) for the actual biological read.
 
+**Runtime, CPU, no `--probe-metrics-csv`**: well under a minute (density +
+max-activating examples only, streamed over a bounded residue subsample).
+**With `--probe-metrics-csv`**: much slower -- easily 10-30+ minutes on
+CPU, since the probe runs nested-cross-validated `LassoCV` (scikit-learn,
+CPU-only, does not use a GPU even if one's available) over the FULL
+dictionary (d_hidden features, e.g. 16384) separately for each
+pooling-method x target combination (2 poolings x up to 4 targets = up to
+8 runs, each doing on the order of a few thousand individual Lasso fits).
+Not stuck, just genuinely expensive -- fine to leave running in the
+background.
+
 **7. (Optional) LLM auto-labeling** -- have a cheap model draft a one-
 sentence description of each feature's pattern from its max-activating
 examples, instead of a human reading every leaderboard by hand:

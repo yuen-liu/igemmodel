@@ -73,11 +73,20 @@ python3 feature_analysis.py \
     --output-dir ../results
 ```
 
-Takes well under a minute on CPU. Writes two files to `sae/results/`:
+Takes well under a minute on CPU **as shown above (no `--probe-metrics-csv`)**.
+Writes two files to `sae/results/`:
 - `feature_stats.csv` -- one row per feature: density, fire count, mean
   activation when active, dead flag.
 - `feature_top_examples.csv` -- for each feature, its top-15 hardest-firing
   residues with local sequence context.
+
+**If you add `--probe-metrics-csv`/`--probe-targets` to run the linear
+probe too** (see `README.md`'s step 6), expect this to take much longer --
+10-30+ minutes on CPU, not under a minute. The probe runs
+nested-cross-validated `LassoCV` (scikit-learn, CPU-only -- a GPU won't
+speed this part up) over the full dictionary separately for each
+pooling-method x target combination, which is a genuinely heavy
+computation, not a hang.
 
 ## Step 2: Pick which features to look at
 
