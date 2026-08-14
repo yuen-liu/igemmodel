@@ -1,0 +1,43 @@
+% New England Computational Biology (NECB 2026) abstract submission.
+% Spec (per https://newenglandcompbio.org/ submission guidelines):
+%   - US Letter, one page max
+%   - Margins: 0.5in left/right/bottom, 0.75in top
+%   - Title: bold, centered, 14-16pt
+%   - Authors/affiliations directly below title; presenting author marked *
+%   - Body: single column, single-spaced, 11pt Times New Roman or similar serif
+%   - Figures/tables/references allowed within the one page
+%   - "Submit in final form -- no copyediting will be performed" -- so this
+%     needs to be submission-ready, not a draft to be cleaned up later.
+
+\documentclass[11pt]{article}
+
+\usepackage[letterpaper, left=0.5in, right=0.5in, top=0.75in, bottom=0.5in]{geometry}
+\usepackage{times}          % Times New Roman-equivalent serif, matches spec
+\usepackage{graphicx}       % for figures, once we have one to add
+\usepackage{setspace}
+\singlespacing
+\pagestyle{empty}           % no page number needed on a one-page abstract
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.75\baselineskip}
+
+\begin{document}
+
+{\fontsize{15}{18}\selectfont\bfseries\centering
+Project SENTINEL: Mechanistically Interpretable Steering of Foundation Models for De Novo Protein Binder Design\par}
+
+\vspace{4pt}
+{\centering
+Bridget Liu*, Vignesh Karthik, Andrew Meng, Yuna Stechert, Davud Skenderi, Lyla Prasad, Osheen Abraham, Leela Iyer, Adit Anand, AJ Sillato\\
+Columbia University\par}
+
+\vspace{10pt}
+
+Engineered protein biosensors hold transformative potential for real-time disease detection, but their development is limited by dependence on generative protein design models that function as black boxes---candidate binders are produced, yet the internal reasoning distinguishing a high-affinity binder from a poor one is scarcely characterized. This opacity limits rational design improvement, failure-mode diagnosis, and adaptation across disease contexts. Project SENTINEL addresses this by introducing a mechanistically interpretable framework for de novo protein binder design. We train sparse autoencoders (SAEs) on ESM-C, a state-of-the-art protein language model, to extract human-readable features from residue-level activations of Boltz-designed binder candidates. As proof-of-concept, we validated this pipeline on Vilip-1, a blood-circulating biomarker of acute neurological injury detectable at low nanomolar concentrations before greater damage occurs. Diversifying training data---incorporating real, evolutionarily distinct sequences and binder designs against additional targets (UCH-L1, B-FABP)---substantially improved generalization beyond synthetic designs alone. Independently trained SAE dictionaries, including one incorporating binder-target co-attention context via ESM-C's native chain-break token, converge on the same residues in real proteins, corroborated by InterPro domain annotations and calibrated LLM-assisted labeling---evidence of genuine structural signal, not training artifacts. This interpretability foundation is the necessary precursor to our ultimate goal: steering generative design toward high-affinity binding features---analogous to concept-guided steering in text-to-image diffusion models---rather than blind latent-space sampling. We are extending this pipeline to UCH-L1, S100B, and B-FABP, SENTINEL's three clinical targets, toward establishing mechanistic interpretability as a universal accelerant for biosensor design across any disease where early detection saves lives.
+
+% To add a figure within the one-page budget:
+% \begin{center}
+%   \includegraphics[width=0.85\linewidth]{figure1.pdf}
+% \end{center}
+
+\end{document}

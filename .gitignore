@@ -27,3 +27,12 @@ vilip1_*_output/
 vilip1_*_per_residue/
 vilip1_*_per_residue.zip
 vilip1_65k_sae_outputs/
+
+# LaTeX build artifacts (paper/) -- keep the .tex source and the compiled
+# .pdf, not the intermediate build files
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
