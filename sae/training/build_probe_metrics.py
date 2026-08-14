@@ -35,7 +35,8 @@ def main() -> None:
     combined = pd.concat(frames, ignore_index=True)
     combined.to_csv(args.output, index=False)
     print(f"Wrote {args.output}: {len(combined)} rows")
-    print(combined[METRIC_COLS].notna().sum())
+    present_cols = [c for c in METRIC_COLS if c in combined.columns]
+    print(combined[present_cols].notna().sum())
 
 
 if __name__ == "__main__":
