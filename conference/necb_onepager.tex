@@ -1,0 +1,70 @@
+% NECB 2026 one-page submission -- structured version with figure/table
+% placeholders, distinct from necb_abstract.tex (which is the plain
+% abstract-book PDF matching the ISCB form's exact text). This one makes
+% fuller use of the one-page budget with sections + a results figure.
+%
+% Spec (per https://newenglandcompbio.org/ submission guidelines):
+%   - US Letter, one page max
+%   - Margins: 0.5in left/right/bottom, 0.75in top
+%   - Title: bold, centered, 14-16pt
+%   - Authors/affiliations directly below title; presenting author marked *
+%   - Body: single column, single-spaced, 11pt Times New Roman or similar serif
+%   - Figures/tables/references allowed within the one page
+%
+% PLACEHOLDERS -- search for "TODO" before submitting:
+%   - Figure 1: cross-dictionary consistency / InterPro corroboration figure
+%   - Results numbers: pull final values from sae/RESULTS.md once confirmed
+%   - References, if we want any
+
+\documentclass[11pt]{article}
+
+\usepackage[letterpaper, left=0.5in, right=0.5in, top=0.75in, bottom=0.5in]{geometry}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{setspace}
+\singlespacing
+\pagestyle{empty}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4\baselineskip}
+
+% Manual compact section heading (avoids relying on titlesec, not present
+% in this minimal TeX install) -- bold, tight spacing above/below.
+\newcommand{\onepagersection}[1]{\vspace{0.4\baselineskip}{\bfseries #1}\vspace{0.1\baselineskip}\par}
+
+\begin{document}
+
+{\fontsize{15}{18}\selectfont\bfseries\centering
+Project SENTINEL: Mechanistically Interpretable Steering of Foundation Models for De Novo Protein Binder Design\par}
+
+\vspace{4pt}
+{\centering
+Bridget Liu*, Vignesh Karthik, Andrew Meng, Yuna Stechert, Davud Skenderi, Lyla Prasad, Osheen Abraham, Leela Iyer, Adit Anand, AJ Sillato\\
+Columbia University\par}
+
+\vspace{8pt}
+
+\onepagersection{Motivation}
+Engineered protein biosensors offer real-time disease detection, but generative binder-design models remain black boxes: candidate binders are produced without characterizing the internal reasoning that separates a high-affinity binder from a poor one. This opacity limits rational design improvement, failure-mode diagnosis, and cross-disease adaptation.
+
+\onepagersection{Approach}
+We train sparse autoencoders (SAEs) on residue-level activations of ESM-C (a state-of-the-art protein language model), extracted from Boltz-designed binder candidates, to recover human-readable features underlying binder representations. As proof-of-concept, we validate this pipeline end-to-end on Vilip-1, a blood-circulating biomarker of acute neurological injury.
+
+\onepagersection{Results}
+\begin{itemize}
+\setlength{\itemsep}{1pt}
+\setlength{\topsep}{2pt}
+  \item Diversifying SAE training data -- folding in real, evolutionarily distinct sequences alongside synthetic designs, and mixing in binder-design data from additional targets (UCH-L1, B-FABP) -- substantially improved generalization to real proteins beyond synthetic designs alone. % TODO: insert final natural-binder FVE numbers from sae/RESULTS.md once confirmed for the paper
+  \item Independently trained SAE dictionaries -- including one incorporating binder-target co-attention context via ESM-C's native chain-break token -- converge on the same residues in real proteins for a subset of examined features, corroborated by InterPro domain annotations and calibrated LLM-assisted labeling.
+  \item This convergence holds up against the obvious confound (shared random initialization across runs): the agreeing dictionaries mostly rely on different learned feature indices to detect the same real residues, evidence of genuine independent convergence rather than an artifact of training setup.
+\end{itemize}
+
+\vspace{4pt}
+\begin{center}
+  \fbox{\parbox[c][1.6in][c]{0.85\linewidth}{\centering \textbf{Figure 1 (TODO).} Cross-dictionary consistency / InterPro corroboration figure -- placeholder.}}
+\end{center}
+
+\onepagersection{Ongoing \& Future Work}
+This interpretability foundation is the necessary precursor to our ultimate goal: steering generative design toward high-affinity binding features, analogous to concept-guided steering in text-to-image diffusion models, rather than blind latent-space sampling. We are extending this pipeline to UCH-L1, S100B, and B-FABP -- SENTINEL's three clinical targets -- and evaluating whether SAE features predict binding-quality metrics (binding confidence, ipTM, ipSAE) directly, toward establishing mechanistic interpretability as a universal accelerant for biosensor design.
+
+\end{document}
