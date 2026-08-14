@@ -398,11 +398,11 @@ def run_linear_probe(
     n_splits = min(cv, len(y))
     outer_kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
     inner_kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    probe_model = LassoCV(cv=inner_kf, random_state=seed, max_iter=10_000)
+    probe_model = LassoCV(cv=inner_kf, random_state=seed, max_iter=10_000, n_jobs=-1)
     oof_pred = cross_val_predict(probe_model, X, y, cv=outer_kf)
     honest_r2 = r2_score(y, oof_pred)
 
-    final_model = LassoCV(cv=inner_kf, random_state=seed, max_iter=10_000).fit(X, y)
+    final_model = LassoCV(cv=inner_kf, random_state=seed, max_iter=10_000, n_jobs=-1).fit(X, y)
     nonzero = np.nonzero(final_model.coef_)[0]
     multivariate = pd.DataFrame({"feature": nonzero, "lasso_coef": final_model.coef_[nonzero]})
     multivariate = multivariate.reindex(multivariate["lasso_coef"].abs().sort_values(ascending=False).index)
