@@ -101,10 +101,24 @@ scp'd down from Waluigi's `~/analysis/`) each have `feature_stats.csv` +
   residue: `binder_dataset_vilip1`, position 1715, context
   `MQLRYN[I]SQLEEW` (run4 feature 14247, density=0.7646; paired feature
   582, density=0.7631).
-- Not yet done: reading through more of `feature_top_examples.csv` for an
-  actual biological interpretation of what these convergent features
-  detect (motif? secondary structure position? something else) --
-  candidate next step, doesn't need the cluster, can be done locally from
-  the scp'd CSVs.
+- **InterPro annotations (2026-08-14)**: ran `fetch_interpro.py` on an
+  11-feature hand-picked subset per checkpoint (3 highest-density +
+  3 rare-but-strong, per `FEATURE_LABELING_SETUP.md`'s own pilot recipe,
+  plus one representative feature per cross-dictionary overlap hotspot
+  above). Real domain/family coverage, surprisingly high for a mostly-de-
+  novo-design corpus (expected sparse per the setup doc): run4 131/165
+  examples annotated (79.4%), run_paired 136/165 (82.4%) -- makes sense in
+  hindsight, since this feature subset specifically targets features tied
+  to real natural-protein examples, not synthetic designs. Notable
+  cross-checkpoint pattern: run4's feature 2214 fires on 9 consecutive
+  real-protein positions (365-375 in evalbinder_P36222/P36222), all in
+  `GH_hydrolase_sf (IPR017853)`; run_paired's feature 3896 shows the same
+  coherent-motif pattern independently -- 5 consecutive positions
+  (370-374 in evalbinder_P49810) all in `Peptidase_A22A (IPR001108)`. Full
+  results + methodology in
+  `sae/analysis/sae_feature_analysis_run4_vs_paired.ipynb`.
+- Not yet done: LLM auto-labeling (`label_features.py`) on this same
+  feature set -- optional next step, needs an Anthropic API key set up
+  per `FEATURE_LABELING_SETUP.md` step 5.
 - **Probe (`cv_r2`) not run** -- see the "linear probe deprioritized"
   note above. Co-attention question still open.
