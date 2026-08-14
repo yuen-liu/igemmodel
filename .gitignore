@@ -16,3 +16,14 @@ sae/.venv/
 sae/results/
 REG3A_final_25_33/
 REG3A_final_45_57/
+
+# large per-run data/output dirs at repo root (checkpoints, activations,
+# benchmark/feature-analysis results) -- scp'd down from Waluigi for local
+# inspection, not meant to be committed
+checkpoints_65k*/
+benchmark_results*/
+feature_analysis_*/
+vilip1_*_output/
+vilip1_*_per_residue/
+vilip1_*_per_residue.zip
+vilip1_65k_sae_outputs/
