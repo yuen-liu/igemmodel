@@ -8,32 +8,57 @@
 %   - Figures/tables/references allowed within the one page
 %   - "Submit in final form -- no copyediting will be performed" -- so this
 %     needs to be submission-ready, not a draft to be cleaned up later.
-
 \documentclass[11pt]{article}
-
 \usepackage[letterpaper, left=0.5in, right=0.5in, top=0.75in, bottom=0.5in]{geometry}
 \usepackage{times}          % Times New Roman-equivalent serif, matches spec
 \usepackage{graphicx}       % for figures, once we have one to add
 \usepackage{setspace}
+\usepackage{titling}        % lets \maketitle be restyled to bold/14-16pt, no date
 \singlespacing
 \pagestyle{empty}           % no page number needed on a one-page abstract
-
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.75\baselineskip}
+ 
+% -- Restyle \maketitle to meet the bold/14-16pt/no-date requirement --
+% Uses \centering (a declaration) instead of the center *environment* --
+% titling splices \pretitle/\posttitle together at \maketitle time, so a
+% \begin{center}...\end{center} split across the two macros is valid LaTeX
+% but trips per-line brace/environment checkers (e.g. Overleaf's code
+% check) since each macro's argument looks unbalanced in isolation.
+\setlength{\droptitle}{-0.5in}
+\pretitle{\centering\fontsize{15}{18}\selectfont\bfseries}
+\posttitle{\par\vspace{4pt}}
+% Also override \preauthor/\postauthor: titling's default wraps \author in
+% a tabular[t]{c} (single table cell), which does NOT line-wrap -- that's
+% what caused the overfull hbox with a 10-name author list. Plain
+% \centering lets it wrap normally like any paragraph.
+\preauthor{\centering\large}
+\postauthor{\par}
+\predate{}
+\postdate{}
+\date{}
+ 
+\title{Feasibility of Sparse Autoencoders to Identify Interpretable Features from Protein Language Models' Latent Representation}
+\author{
+    Bridget Liu$^{\ast\dagger}$,
+    Vignesh Karthik$^{\dagger}$,
+    Andrew Meng$^{\dagger}$,
+    Yuna Stechert,
+    Davud Skenderi,
+    Lyla Prasad,
+    Osheen Abraham,
+    Leela Iyer,
+    Adit Anand,
+    AJ Sillato \\[6pt]
+    {\small $^{1}$Columbia University, New York, NY, USA} \\
+    {\small $^{\ast}$Presenting author, $^{\dagger}$These authors contributed equally to this work}
+}
 
 \begin{document}
+\maketitle
 
-{\fontsize{15}{18}\selectfont\bfseries\centering
-Project SENTINEL: Mechanistically Interpretable Steering of Foundation Models for De Novo Protein Binder Design\par}
+Generative protein-design models produce candidate binders without revealing what internally distinguishes a strong binder from a weak one, limiting rational improvement and failure diagnosis. We apply sparse autoencoders (SAEs), a mechanistic-interpretability technique, to residue-level ESM-C activations of previously Boltz-designed binder candidates against Vilip-1, a blood biomarker of acute neurological injury, to identify human-interpretable features captured in these underlying latent representations without generating or modifying any binder sequences ourselves. Compared to leveraging solely synthetic designs, mixing real, evolutionarily distinct natural-protein sequences into SAE training was the largest lever for generalization found, raising held-out natural-protein reconstruction fidelity from 0.39 to 0.60 fraction of variance explained. To test whether learned features reflect genuine protein structure rather than training artifacts, we compared two independently trained SAE dictionaries: encoding binders alone and encoding binders with full cross-attention to their target before target positions were discarded. Despite using different encoding, each dictionary's most generic features converge on the same real-protein residues far more than chance predicts, indicating that cross-attention preserves the learned signal. This convergence survives a shared-seed confound check (5 of 6 agreeing cases use different learned feature indices per dictionary) and is independently corroborated by InterPro domain annotations and calibrated LLM-assisted labeling that withholds a description when evidence is scattered. Together, these results establish that SAE features recovered from protein language model activations carry real, reproducible structural signal, a necessary validation step before any attempt to use such features to inform or steer binder design.
 
-\vspace{4pt}
-{\centering
-Bridget Liu*, Vignesh Karthik, Andrew Meng, Yuna Stechert, Davud Skenderi, Lyla Prasad, Osheen Abraham, Leela Iyer, Adit Anand, AJ Sillato\\
-Columbia University\par}
-
-\vspace{10pt}
-
-Engineered protein biosensors hold transformative potential for real-time disease detection, but their development is limited by dependence on generative protein design models that function as black boxes---candidate binders are produced, yet the internal reasoning distinguishing a high-affinity binder from a poor one is scarcely characterized. This opacity limits rational design improvement, failure-mode diagnosis, and adaptation across disease contexts. Project SENTINEL addresses this by introducing a mechanistically interpretable framework for de novo protein binder design. We train sparse autoencoders (SAEs) on ESM-C, a state-of-the-art protein language model, to extract human-readable features from residue-level activations of Boltz-designed binder candidates. As proof-of-concept, we validated this pipeline on Vilip-1, a blood-circulating biomarker of acute neurological injury detectable at low nanomolar concentrations before greater damage occurs. Diversifying training data---incorporating real, evolutionarily distinct sequences and binder designs against additional targets (UCH-L1, B-FABP)---substantially improved generalization beyond synthetic designs alone. Independently trained SAE dictionaries, including one incorporating binder-target co-attention context via ESM-C's native chain-break token, converge on the same residues in real proteins, corroborated by InterPro domain annotations and calibrated LLM-assisted labeling---evidence of genuine structural signal, not training artifacts. This interpretability foundation is the necessary precursor to our ultimate goal: steering generative design toward high-affinity binding features---analogous to concept-guided steering in text-to-image diffusion models---rather than blind latent-space sampling. We are extending this pipeline to UCH-L1, S100B, and B-FABP, SENTINEL's three clinical targets, toward establishing mechanistic interpretability as a universal accelerant for biosensor design across any disease where early detection saves lives.
 
 % To add a figure within the one-page budget:
 % \begin{center}
