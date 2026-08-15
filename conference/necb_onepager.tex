@@ -1,7 +1,7 @@
 % NECB 2026 one-page submission -- structured version with figure/table
 % placeholders, distinct from necb_abstract.tex (which is the plain
 % abstract-book PDF matching the ISCB form's exact text). This one makes
-% fuller use of the one-page budget with sections + a results figure.
+% fuller use of the one-page budget with sections.
 %
 % Spec (per https://newenglandcompbio.org/ submission guidelines):
 %   - US Letter, one page max
@@ -12,7 +12,6 @@
 %   - Figures/tables/references allowed within the one page
 %
 % PLACEHOLDERS -- search for "TODO" before submitting:
-%   - Figure 1: cross-dictionary consistency / InterPro corroboration figure
 %   - Results numbers: pull final values from sae/RESULTS.md once confirmed
 %   - References, if we want any
 
@@ -55,14 +54,9 @@ We train sparse autoencoders (SAEs) on ESM-C PLM's residue-level activations tha
 \setlength{\itemsep}{1pt}
 \setlength{\topsep}{2pt}
   \item Diversifying SAE training data: folding in real, evolutionarily distinct sequences alongside synthetic designs, and mixing in binder-design data from additional targets (UCH-L1, B-FABP) substantially improved generalization to real proteins beyond synthetic designs alone. % TODO: insert final natural-binder FVE numbers from sae/RESULTS.md once confirmed for the paper
-  \item Independently trained SAE dictionaries: including one binder-target co-attention context via ESM-C's native chain-break token converges on the same residues in real proteins for a subset of examined features, corroborated by InterPro domain annotations and calibrated LLM-assisted labeling.
+  \item Independently trained SAE dictionaries: including one incorporating binder-target co-attention context via ESM-C's native chain-break token converges on the same residues in real proteins for a subset of examined features, corroborated by InterPro domain annotations and calibrated LLM-assisted labeling.
   \item This convergence holds up against the confound of shared random initialization across runs: the agreeing dictionaries mostly rely on different learned feature indices to detect the same real residues, evidence of genuine independent convergence rather than an artifact of training setup.
 \end{itemize}
-
-\vspace{4pt}
-\begin{center}
-  \fbox{\parbox[c][1.6in][c]{0.85\linewidth}{\centering \textbf{Figure 1 (TODO).} Cross-dictionary consistency / InterPro corroboration figure -- placeholder.}}
-\end{center}
 
 \onepagersection{Ongoing \& Future Work}
 This interpretability evaluation is a necessary precursor to our broader goal of steering generative design toward high-affinity binding features, analogous to concept-guided steering in text-to-image diffusion models, rather than blindly sampling the latent space. We plan to extend this pipeline to three clinical targets (UCH-L1, S100B, and B-FABP) and evaluate whether SAE features predict binding-quality metrics (binding confidence, ipTM, ipSAE) directly, thus helping establish the value of mechanistic interpretability in accelerating PLM-informed biosensor design.
