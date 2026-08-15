@@ -21,6 +21,7 @@
 \usepackage{times}
 \usepackage{graphicx}
 \usepackage{setspace}
+\usepackage{titling}        % lets \maketitle be restyled to bold/14-16pt, no date
 \singlespacing
 \pagestyle{empty}
 
@@ -31,17 +32,37 @@
 % in this minimal TeX install) -- bold, tight spacing above/below.
 \newcommand{\onepagersection}[1]{\vspace{0.4\baselineskip}{\bfseries #1}\vspace{0.1\baselineskip}\par}
 
-\begin{document}
+% -- Restyle \maketitle to match necb_abstract.tex's title/author block --
+\setlength{\droptitle}{-0.5in}
+\pretitle{\centering\fontsize{15}{18}\selectfont\bfseries}
+\posttitle{\par\vspace{4pt}}
+\preauthor{\centering\large}
+\postauthor{\par}
+\predate{}
+\postdate{}
+\date{}
 
-{\fontsize{15}{18}\selectfont\bfseries\centering
-Project SENTINEL: Mechanistically Interpretable Steering of Foundation Models for De Novo Protein Binder Design\par}
+\title{Seeing Inside the Model: Mechanistic Interpretability for Better Protein Biosensor Design}
+\author{
+    Bridget Liu$^{\ast\dagger}$,
+    Vignesh Karthik$^{\dagger}$,
+    Andrew Meng$^{\dagger}$,
+    Yuna Stechert,
+    Davud Skenderi,
+    Lyla Prasad,
+    Osheen Abraham,
+    Leela Iyer,
+    Adit Anand,
+    AJ Sillato \\[6pt]
+    {\small $^{1}$Columbia University, New York, NY, USA} \\
+    {\small $^{\ast}$Presenting author, $^{\dagger}$These authors contributed equally to this work}
+}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
 
 \vspace{4pt}
-{\centering
-Bridget Liu*, Vignesh Karthik, Andrew Meng, Yuna Stechert, Davud Skenderi, Lyla Prasad, Osheen Abraham, Leela Iyer, Adit Anand, AJ Sillato\\
-Columbia University\par}
-
-\vspace{8pt}
 
 \onepagersection{Motivation}
 Engineered protein biosensors offer real-time disease detection, but the current practice to develop these biosensors requires extensive human effort to design and validate them. Protein language models (PLMs) are an evolving methodology that alleviates the manual overhead involved in the design process, but generative binder-design models remain black boxes. In their current state, PLMs produce candidate binders without characterizing the internal reasoning that separates a high-affinity binder from a poor one. This opacity limits rational design improvement, failure-mode diagnosis, and cross-disease adaptation.
