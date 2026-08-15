@@ -45,18 +45,18 @@ Columbia University\par}
 \vspace{8pt}
 
 \onepagersection{Motivation}
-Engineered protein biosensors offer real-time disease detection, but generative binder-design models remain black boxes: candidate binders are produced without characterizing the internal reasoning that separates a high-affinity binder from a poor one. This opacity limits rational design improvement, failure-mode diagnosis, and cross-disease adaptation.
+Engineered protein biosensors offer real-time disease detection, but the current practice to develop these biosensors requires extensive human effort to design and validate them. Protein language models (PLMs) are an evolving methodology that alleviates the manual overhead involved in the design process, but generative binder-design models remain black boxes. In their current state, PLMs produce candidate binders without characterizing the internal reasoning that separates a high-affinity binder from a poor one. This opacity limits rational design improvement, failure-mode diagnosis, and cross-disease adaptation.
 
 \onepagersection{Approach}
-We train sparse autoencoders (SAEs) on residue-level activations of ESM-C (a state-of-the-art protein language model), extracted from Boltz-designed binder candidates, to recover human-readable features underlying binder representations. As proof-of-concept, we validate this pipeline end-to-end on Vilip-1, a blood-circulating biomarker of acute neurological injury.
+We train sparse autoencoders (SAEs) on ESM-C PLM's residue-level activations that we extracted from Boltz-designed binder candidates, to recover human-readable features present in the PLM's underlying latent representation. As proof-of-concept, we validate this pipeline through an end-to-end evaluation on Vilip-1, a blood-circulating biomarker of acute neurological injury.
 
 \onepagersection{Results}
 \begin{itemize}
 \setlength{\itemsep}{1pt}
 \setlength{\topsep}{2pt}
-  \item Diversifying SAE training data -- folding in real, evolutionarily distinct sequences alongside synthetic designs, and mixing in binder-design data from additional targets (UCH-L1, B-FABP) -- substantially improved generalization to real proteins beyond synthetic designs alone. % TODO: insert final natural-binder FVE numbers from sae/RESULTS.md once confirmed for the paper
-  \item Independently trained SAE dictionaries -- including one incorporating binder-target co-attention context via ESM-C's native chain-break token -- converge on the same residues in real proteins for a subset of examined features, corroborated by InterPro domain annotations and calibrated LLM-assisted labeling.
-  \item This convergence holds up against the obvious confound (shared random initialization across runs): the agreeing dictionaries mostly rely on different learned feature indices to detect the same real residues, evidence of genuine independent convergence rather than an artifact of training setup.
+  \item Diversifying SAE training data: folding in real, evolutionarily distinct sequences alongside synthetic designs, and mixing in binder-design data from additional targets (UCH-L1, B-FABP) substantially improved generalization to real proteins beyond synthetic designs alone. % TODO: insert final natural-binder FVE numbers from sae/RESULTS.md once confirmed for the paper
+  \item Independently trained SAE dictionaries: including one binder-target co-attention context via ESM-C's native chain-break token converges on the same residues in real proteins for a subset of examined features, corroborated by InterPro domain annotations and calibrated LLM-assisted labeling.
+  \item This convergence holds up against the confound of shared random initialization across runs: the agreeing dictionaries mostly rely on different learned feature indices to detect the same real residues, evidence of genuine independent convergence rather than an artifact of training setup.
 \end{itemize}
 
 \vspace{4pt}
@@ -65,6 +65,6 @@ We train sparse autoencoders (SAEs) on residue-level activations of ESM-C (a sta
 \end{center}
 
 \onepagersection{Ongoing \& Future Work}
-This interpretability foundation is the necessary precursor to our ultimate goal: steering generative design toward high-affinity binding features, analogous to concept-guided steering in text-to-image diffusion models, rather than blind latent-space sampling. We are extending this pipeline to UCH-L1, S100B, and B-FABP -- SENTINEL's three clinical targets -- and evaluating whether SAE features predict binding-quality metrics (binding confidence, ipTM, ipSAE) directly, toward establishing mechanistic interpretability as a universal accelerant for biosensor design.
+This interpretability evaluation is a necessary precursor to our broader goal of steering generative design toward high-affinity binding features, analogous to concept-guided steering in text-to-image diffusion models, rather than blindly sampling the latent space. We plan to extend this pipeline to three clinical targets (UCH-L1, S100B, and B-FABP) and evaluate whether SAE features predict binding-quality metrics (binding confidence, ipTM, ipSAE) directly, thus helping establish the value of mechanistic interpretability in accelerating PLM-informed biosensor design.
 
 \end{document}
