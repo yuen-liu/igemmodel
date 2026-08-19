@@ -5,7 +5,7 @@ for pulling numbers into the New England Comp Bio conference abstract
 later (https://newenglandcompbio.org/) without re-digging through chat
 history. Update this whenever a new run/benchmark lands.
 
-All runs: ESM-C layer 23, per-token TopK SAE (`sae/training/sae_model.py`),
+All runs: ESM-C layer 23, per-token TopK SAE (`sae/03_train/sae_model.py`),
 `k=64`, `auxk=256`, `batch_size=4096`, `epochs=50`, `lr=4e-4`. "Natural FVE"
 = `natural_binders_qualitative` pooled FVE from `benchmark.py` (ours vs.
 Biohub's official ESMC-300M-sae-k64-codebook16384, both compared against
@@ -52,8 +52,7 @@ the same shared baseline). Biohub's own natural FVE is consistently
    other run, so reconstruction quality isn't degraded. The actual
    co-attention question ("does it predict binding affinity better") is
    answered by the `feature_analysis.py` probe comparison, not FVE --
-   see `feature_analysis_run4/` vs `feature_analysis_paired/` results
-   once both are in.
+   see `sae/results/run4/` vs `sae/results/paired/` results once both are in.
 
 **Decision (2026-08-13): `run4_natural_mix` chosen as the primary
 checkpoint for feature analysis** (Vignesh's `feature_analysis.py`) --
@@ -79,10 +78,9 @@ not exposed via CLI) rather than skipping it entirely.
 ## Feature analysis results
 
 **Qualitative pass done (2026-08-14), probe not run (see note above).**
-`feature_analysis_run4/` and `feature_analysis_paired/` (local repo root,
-scp'd down from Waluigi's `~/analysis/`) each have `feature_stats.csv` +
-`feature_top_examples.csv` from `feature_analysis.py` without
-`--probe-metrics-csv`.
+`sae/results/run4/` and `sae/results/paired/` (scp'd down from Waluigi's
+`~/analysis/`) each have `feature_stats.csv` + `feature_top_examples.csv`
+from `feature_analysis.py` without `--probe-metrics-csv`.
 
 - Both dictionaries healthy: 18/16384 dead (run4), 31/16384 dead (paired),
   both <0.2%. Similar density distributions (median ~0.0016-0.0018) and
@@ -116,7 +114,7 @@ scp'd down from Waluigi's `~/analysis/`) each have `feature_stats.csv` +
   coherent-motif pattern independently -- 5 consecutive positions
   (370-374 in evalbinder_P49810) all in `Peptidase_A22A (IPR001108)`. Full
   results + methodology in
-  `sae/analysis/sae_feature_analysis_run4_vs_paired.ipynb`.
+  `sae/notebooks/sae_feature_analysis_run4_vs_paired.ipynb`.
 - **LLM auto-labeling done** (`label_features.py`, Claude Haiku 4.5 via
   Message Batches API, same 11-feature subset per checkpoint, InterPro
   evidence included). Well-calibrated: correctly returns "No clear
@@ -136,4 +134,4 @@ scp'd down from Waluigi's `~/analysis/`) each have `feature_stats.csv` +
 - **Probe (`cv_r2`) not run** -- see the "linear probe deprioritized"
   note above. Co-attention question still open.
 - Full methodology + reproducible cells:
-  `sae/analysis/sae_feature_analysis_run4_vs_paired.ipynb`.
+  `sae/notebooks/sae_feature_analysis_run4_vs_paired.ipynb`.

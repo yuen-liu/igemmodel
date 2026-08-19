@@ -1,6 +1,21 @@
-"""Pool per-residue sparse codes to one vector per protein, for every design
+"""LEGACY / SUPERSEDED -- kept for reference, not part of the current pipeline.
+
+Originally written to pool per-residue sparse codes to one vector per
+protein, feeding a planned `probe.py` + `cluster_crosscheck.py` split. Those
+two scripts were never built -- `feature_analysis.py` (../05_interpret/)
+now does its own pooling + linear probe inline instead. Nothing in the
+documented pipeline (see ../README.md) calls this file; don't wire it into
+a real run without first checking it still matches `data.py`/`sae_model.py`
+(../03_train/), since it hasn't been exercised since that split happened.
+
+Original docstring follows.
+
+---
+
+Pool per-residue sparse codes to one vector per protein, for every design
 protein in a manifest (train+val both -- unlike benchmark.py, which only
-scores the held-out split). Feeds `probe.py` and `cluster_crosscheck.py`.
+scores the held-out split). Feeds `probe.py` and `cluster_crosscheck.py`
+(never built -- see LEGACY note above).
 
 Two modes, run separately (see each mode's docstring below for why):
 
@@ -21,7 +36,7 @@ import argparse
 from pathlib import Path
 
 # NOTE: import order matters on this machine -- numpy must load before torch,
-# see sae/training/data.py's module docstring for the segfault this avoids.
+# see sae/03_train/data.py's module docstring for the segfault this avoids.
 import numpy as np
 import pandas as pd
 import torch
@@ -33,7 +48,8 @@ def run_ours(args) -> None:
     SAE is small enough to encode with on CPU -- no cluster/GPU needed."""
     import sys
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "training"))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data"))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "03_train"))
     from data import center_scale  # noqa: E402
     from sae_model import SparseAutoencoder  # noqa: E402
 
@@ -84,10 +100,10 @@ def run_biohub(args) -> None:
     same constraint as benchmark.py, since this loads the real ESMC-300M
     model + Biohub's official SAE hook. Reuses benchmark.py's already-
     verified `run_batches` (same CLS/EOS masking) instead of re-deriving the
-    encode path -- run this from the same directory benchmark.py lives in."""
+    encode path -- benchmark.py lives in ../04_benchmark/."""
     import sys
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "training"))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "04_benchmark"))
     from benchmark import BIOHUB_MODEL, BIOHUB_SAE_REPO, LAYER, run_batches  # noqa: E402
     from transformers import AutoModel, AutoTokenizer  # noqa: E402
 

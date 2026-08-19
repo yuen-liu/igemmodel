@@ -73,6 +73,7 @@ Writes (to --output-dir):
 import argparse
 import heapq
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,10 +81,13 @@ from pathlib import Path
 # before numpy segfaults). Import numpy-touching modules before torch.
 import numpy as np  # noqa: F401
 import pandas as pd
-from data import EVAL_ONLY_SOURCES, center_scale
 import torch
 
-from sae_model import SparseAutoencoder
+# data.py lives in ../02_prepare_data, sae_model.py in ../03_train
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "03_train"))
+from data import EVAL_ONLY_SOURCES, center_scale  # noqa: E402
+from sae_model import SparseAutoencoder  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

@@ -7,8 +7,8 @@ Must run on the cluster, in a venv with the real `esm` package installed
 from the CUDA-11.8 pin that venv needs for Waluigi's older driver):
 
     source /tmp/esm_verify_venv/bin/activate
-    # scp sae/training/{sae_model.py,data.py,benchmark.py}, our trained
-    # checkpoint, and manifest_combined.csv up first
+    # scp sae/03_train/{sae_model.py,data.py}, sae/04_benchmark/benchmark.py,
+    # our trained checkpoint, and manifest_combined.csv up first
     python benchmark.py --checkpoint best.pt --manifest manifest_combined.csv \\
         --output-dir benchmark_results --smoke-test
     python benchmark.py --checkpoint best.pt --manifest manifest_combined.csv \\
@@ -38,6 +38,7 @@ sequences (data.EVAL_ONLY_SOURCES):
 """
 
 import argparse
+import sys
 from pathlib import Path
 
 import numpy  # import order guard -- see train.py's note (torch-before-numpy segfaults here)
@@ -47,8 +48,11 @@ from huggingface_hub import hf_hub_download
 from safetensors import safe_open
 from transformers import AutoModel, AutoTokenizer
 
-from data import EVAL_ONLY_SOURCES, center_scale, uncenter_unscale
-from sae_model import SparseAutoencoder
+# data.py lives in ../02_prepare_data, sae_model.py in ../03_train
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "03_train"))
+from data import EVAL_ONLY_SOURCES, center_scale, uncenter_unscale  # noqa: E402
+from sae_model import SparseAutoencoder  # noqa: E402
 
 BIOHUB_MODEL = "biohub/ESMC-300M"
 BIOHUB_SAE_REPO = "biohub/ESMC-300M-sae-k64-codebook16384"

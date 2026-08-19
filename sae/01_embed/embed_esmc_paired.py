@@ -3,7 +3,7 @@ layer 23, writing out only the binder-span per-residue activations -- a
 residue-aligned, drop-in alternative to embed_esmc.py's plain binder-alone
 per-residue output, for the SAME protein ids. Step 2 of the SAE roadmap:
 compare binder-alone vs. binder+target sparse-code activations/predictions
-(sae/analysis/, not yet extended for this -- see the plan).
+(sae/notebooks/, not yet extended for this -- see the plan).
 
 Uses ESM-C's NATIVE chain-break token, `|` -- confirmed present in
 `ESMCTokenizer().get_vocab()` (id 31, alongside the 20 amino acids and the

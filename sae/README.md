@@ -19,14 +19,25 @@ mechanistic interpretability to become a universal accelerant for rational
 protein binder design, adaptable to any disease where early detection saves
 lives.
 
-**New to this repo and want to run the feature-labeling pipeline
-yourself?** See [`FEATURE_LABELING_SETUP.md`](FEATURE_LABELING_SETUP.md)
-for a step-by-step setup + run guide, including getting an Anthropic API
-key and setting a spend limit. This README covers what the pipeline does
-and why; that doc covers how to actually run it on your machine.
-
 This directory (`sae/`) is the interpretability framework itself: SAE
 training + benchmarking infrastructure for ESM-C-based binder embeddings.
+
+## Where do I start?
+
+- **New to this repo, want to run the whole pipeline yourself?** Start at
+  [Directory layout](#directory-layout) below, then read
+  [Pipeline](#pipeline-as-run-for-vilip1-same-steps-apply-to-any-target) --
+  it's numbered `01_embed/` through `05_interpret/`, in the order you'd
+  actually run things, matching the folder names.
+- **Just want to run the feature-labeling step** (steps 6-8 below, using an
+  already-trained checkpoint someone gave you)? Skip straight to
+  [`FEATURE_LABELING_SETUP.md`](FEATURE_LABELING_SETUP.md) -- a mechanical
+  "how do I actually run it" companion to this README, including getting an
+  Anthropic API key and setting a spend limit.
+- **Just want the results, not the pipeline?** See
+  [`RESULTS.md`](RESULTS.md) (every training/benchmark run, in one running
+  table) and `sae/results/run4/` + `sae/results/paired/` (the committed
+  feature-analysis output for the two checkpoints that matter most so far).
 
 ## Status: validated on vilip1, not yet applied to the three clinical targets
 
@@ -49,24 +60,55 @@ different `--manifest`/`--data-dir`) is the natural next step, not yet done.
 
 ## Directory layout
 
+Folders are numbered in the order you'd actually run the pipeline (steps
+below correspond 1:1 to these numbers, except step 5 "analyze", which is the
+`notebooks/` folder rather than its own numbered stage):
+
 ```
 sae/
-  pretraining/
-    inference/embed_esmc.py   # ESM-C embedding extraction (pooled + --per-residue mode)
-    verify_sae_formula.py     # one-off: confirms Biohub's official SAE forward-pass math
-                               # against their real installed source
-  training/
-    data.py                    # loads per-residue activations, builds train/val split
-    sae_model.py                # our SAE: per-token TopK (k=64), mean-centering, AuxK dead-feature revival
-    train.py                    # trains our SAE, logs per-epoch metrics + checkpoints
-    benchmark.py                 # ours vs. Biohub's official general-purpose SAE, on the same held-out residues
-    feature_analysis.py          # per-feature density + max-activating examples, linear probe vs. binding metrics
-    label_features.py            # LLM auto-labeling of features from their max-activating examples (optional, costs API $)
-    fetch_interpro.py            # InterPro domain/family annotations per example residue, via EBI's REST API (optional)
-  analysis/
-    sae_benchmark_analysis.ipynb   # training curves + benchmark comparison plots
-    sae_feature_analysis.ipynb     # feature density/interpretation plots + probe results, reads feature_analysis.py's output
+  01_embed/
+    embed_esmc.py         # ESM-C embedding extraction (pooled + --per-residue mode), binder-alone
+    embed_esmc_paired.py  # same, but WITH the target present (co-attention variant, Step 2 of the roadmap --
+                           # see its own docstring; not yet extended past vilip1/VSNL1)
+  02_prepare_data/
+    combine_datasets.py           # builds the multi-source training pool manifest (e.g. vilip1 + other targets)
+    build_manifest_from_index.py  # builds manifest_combined.csv from an activations index.csv + a reference manifest
+    patch_manifest_sequence.py    # backfills missing `sequence` values in a combined manifest from other sources
+    build_probe_metrics.py        # combines per-campaign binding metrics (iptm/ipsae/ipae/...) for feature_analysis.py's probe
+    data.py                       # loads per-residue activations, builds train/val split
+  03_train/
+    sae_model.py                    # our SAE: per-token TopK (k=64), mean-centering, AuxK dead-feature revival
+    train.py                        # trains our SAE, logs per-epoch metrics + checkpoints
+    kanneal_16384_dict_sae.ipynb    # exploratory notebook: k-annealing + dict-size=16384 development run
+  04_benchmark/
+    benchmark.py            # ours vs. Biohub's official general-purpose SAE, on the same held-out residues
+  05_interpret/
+    feature_analysis.py     # per-feature density + max-activating examples, linear probe vs. binding metrics
+    label_features.py       # LLM auto-labeling of features from their max-activating examples (optional, costs API $)
+    fetch_interpro.py       # InterPro domain/family annotations per example residue, via EBI's REST API (optional)
+    encode_pooled.py        # LEGACY/superseded -- see its own header docstring; not part of the current pipeline
+  notebooks/
+    sae_benchmark_analysis.ipynb              # training curves + benchmark comparison plots (early/smaller run)
+    sae_benchmark_analysis_65k.ipynb          # same, for the 65k-sequence run
+    sae_feature_analysis.ipynb                # feature density/interpretation plots + probe results, reads feature_analysis.py's output
+    sae_feature_analysis_run4_vs_paired.ipynb # binder-alone vs. binder+target feature-analysis comparison, see RESULTS.md
+  results/
+    run4/    # committed feature_stats/feature_top_examples/interpro_annotations/feature_labels for run4_natural_mix
+    paired/  # same, for run_paired (co-attention) -- see RESULTS.md's "Feature analysis results"
+  README.md                    # this file
+  RESULTS.md                   # running log of every training/benchmark run's numbers
+  FEATURE_LABELING_SETUP.md    # step-by-step setup + run guide for steps 6-8
 ```
+
+**A note on cross-folder imports**: `data.py` lives in `02_prepare_data/`
+and `sae_model.py` in `03_train/`, but `train.py` (`03_train/`),
+`benchmark.py` (`04_benchmark/`), and `feature_analysis.py`
+(`05_interpret/`) all need both. Rather than assume same-directory imports,
+each adds both `../02_prepare_data` and `../03_train` to `sys.path` at the
+top of the file (`train.py` only needs the former, since it's already
+co-located with `sae_model.py`). If you add a new script anywhere in `sae/`
+that needs `data.py` or `sae_model.py`, copy that same pattern rather than
+duplicating either file.
 
 Data and outputs are gitignored (large/generated) and live locally / on the
 cluster, not in this repo:
@@ -82,11 +124,21 @@ cluster, not in this repo:
 
 ## Pipeline (as run for vilip1; same steps apply to any target)
 
+Commands below are shown as bare `python <script>.py ...` calls, run from
+inside the numbered folder that script lives in (see
+[Directory layout](#directory-layout) above) -- e.g. step 2's command is run
+from `sae/01_embed/`, step 3's from `sae/03_train/`, and so on.
+
 **1. Combine manifests + build the training pool.** For vilip1: full20k (20k
 designs) + composite_hotspot (5k designs) = training/val pool; 13 real
 UniProt natural binders held out entirely for qualitative eval only (too few
 points to be statistically meaningful for training, and structurally
-different -- 84-815 residues vs. the designs' 50-150).
+different -- 84-815 residues vs. the designs' 50-150). `02_prepare_data/`
+holds the manifest-building/housekeeping utilities for this step:
+`combine_datasets.py` for mixing multiple design campaigns into one training
+pool, `build_manifest_from_index.py` for building `manifest_combined.csv`
+from an activations `index.csv` plus a reference manifest, and
+`patch_manifest_sequence.py` for backfilling missing `sequence` values.
 
 **2. Extract per-residue activations at one ESM-C layer** (GPU, on Waluigi):
 ```
@@ -143,7 +195,7 @@ zero-baseline FVE regardless of whether a model captures anything
 token-specific.
 
 **5. Analyze**: plot training curves (loss/FVE/dead-feature-count vs. epoch)
-and the benchmark comparison.
+and the benchmark comparison, in `notebooks/`.
 
 **6. Feature (semantic) analysis** -- what do the SAE's individual features
 mean, and are any of them predictive of binder quality?
@@ -163,9 +215,9 @@ probe (per-feature Spearman correlation + nested-cross-validated Lasso)
 against binding-quality metrics the SAE never saw during training -- a
 feature that is both interpretable and predictive of binder quality is
 real evidence of a usable structural correlate, not just a reconstruction
-artifact. `sae_feature_analysis.ipynb` reads this script's output CSVs and
-cross-references the two (predictive features -> their max-activating
-contexts) for the actual biological read.
+artifact. `sae_feature_analysis.ipynb` (`notebooks/`) reads this script's
+output CSVs and cross-references the two (predictive features -> their
+max-activating contexts) for the actual biological read.
 
 **Runtime, CPU, no `--probe-metrics-csv`**: well under a minute (density +
 max-activating examples only, streamed over a bounded residue subsample).
@@ -259,6 +311,9 @@ complete dictionary utilization) but at the expected cost of generalization
 to real, out-of-domain proteins -- a specialist/generalist trade-off,
 measured directly rather than assumed. This validates the pipeline is worth
 applying to the actual clinical targets.
+
+For the full run-by-run comparison (dict size, k-annealing, natural-binder
+mixing, multi-target training, ...), see [`RESULTS.md`](RESULTS.md).
 
 ## Open next steps
 

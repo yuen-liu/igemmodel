@@ -67,7 +67,7 @@ committing them.)
 ## Step 1: Run the base interpretation pass
 
 ```bash
-cd sae/training
+cd sae/05_interpret
 python3 feature_analysis.py \
     --checkpoint ../checkpoints/best.pt --data-dir ../data-dir \
     --output-dir ../results
@@ -254,7 +254,7 @@ also get one set of these per target x pooling-method combination (e.g.
 ## Troubleshooting
 
 - **`python3: can't open file '.../label_features.py'`** -- you're not in
-  `sae/training/`. `cd` there first; all the commands above assume that's
+  `sae/05_interpret/`. `cd` there first; all the commands above assume that's
   your working directory (they use `../results`, `../data-dir`, etc.).
 - **Checkpoint loads but results look wrong/nonsensical** -- double check
   the checkpoint/data-dir pairing (see "What you need before starting"

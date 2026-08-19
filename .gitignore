@@ -13,20 +13,22 @@ sae/checkpoints/
 sae/data-dir/
 sae/vilip1_layer23_65k_per_residue/
 sae/.venv/
-sae/results/
+# sae/results/ holds the committed run4/paired qualitative-analysis CSVs
+# (git mv'd from the repo root) -- ignore everything else dropped here
+# (e.g. ad-hoc --output-dir runs) by default.
+sae/results/*
+!sae/results/run4/
+!sae/results/run4/*.csv
+!sae/results/paired/
+!sae/results/paired/*.csv
 REG3A_final_25_33/
 REG3A_final_45_57/
 
 # large per-run data/output dirs at repo root (checkpoints, activations,
-# benchmark/feature-analysis results) -- scp'd down from Waluigi for local
-# inspection, not meant to be committed
+# benchmark results) -- scp'd down from Waluigi for local inspection, not
+# meant to be committed
 checkpoints_65k*/
 benchmark_results*/
-feature_analysis_*/
-!feature_analysis_run4/
-!feature_analysis_run4/*.csv
-!feature_analysis_paired/
-!feature_analysis_paired/*.csv
 vilip1_*_output/
 vilip1_*_per_residue/
 vilip1_*_per_residue.zip

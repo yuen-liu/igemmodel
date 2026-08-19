@@ -8,17 +8,21 @@ Usage:
 
 import argparse
 import csv
+import sys
 import time
 from pathlib import Path
+
+# data.py lives in ../02_prepare_data, not this directory
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data"))
 
 # NOTE: import order matters on this machine -- importing torch before numpy
 # segfaults in numpy's macOS Accelerate-framework self-check (confirmed via
 # `python -c "import torch; import numpy"` vs. the reverse order). data.py
 # imports numpy/pandas before torch, so importing it first here guarantees
 # numpy loads first process-wide, regardless of what sae_model.py imports.
-from data import center_scale, iter_batches, load_dataset
-from sae_model import SparseAutoencoder, loss_fn
-import torch
+from data import center_scale, iter_batches, load_dataset  # noqa: E402
+from sae_model import SparseAutoencoder, loss_fn  # noqa: E402
+import torch  # noqa: E402
 
 
 def fve(sq_err_sum: float, sq_x_sum: float) -> float:
