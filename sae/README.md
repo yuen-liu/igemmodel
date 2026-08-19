@@ -317,6 +317,8 @@ mixing, multi-target training, ...), see [`RESULTS.md`](RESULTS.md).
 
 ## Open next steps
 
+- **FOR ALL DRY LAB MEMBERS: try training a SAE that outperforms our current
+  baseline SAE** (results by Bridget & Andrew in RESULTS.md)
 - **Apply this same pipeline to UCH-L1, S100B, and B-FABP** -- the actual
   SENTINEL validation targets. Data/campaigns already exist for all three;
   this SAE pipeline does not yet touch them.
