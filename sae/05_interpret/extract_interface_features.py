@@ -73,6 +73,7 @@ import torch
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data"))
 from feature_analysis import load_pool, load_sae  # noqa: E402
 from data import center_scale  # noqa: E402
 
@@ -90,13 +91,13 @@ THREE_TO_ONE = {
 # ---------------------------------------------------------------------------
 # Structure parsing -- minimal PDB/mmCIF heavy-atom readers, same family of
 # hand-rolled parsers already used by ipsae.py/compute_ipae.py in this repo
-# (no biopython dependency). Ligand/hydrogen atoms are dropped; everything
-# else (including modified residues) is kept and grouped by (chain, resnum).
+# (no biopython dependency). Ligand/hydrogen atoms are dropped; every other
+# atom (including modified residues) is kept and grouped by (chain, resnum)
+# at this parsing stage. A modified residue with no entry in THREE_TO_ONE
+# maps to "X" for the sequence check below, which will not match the
+# manifest's real one-letter code -- that design is then skipped downstream
+# (see classify_design) as a sequence mismatch, not silently mishandled.
 # ---------------------------------------------------------------------------
-
-
-def _is_hydrogen(atom_name: str) -> bool:
-    return atom_name[:1] == "H" and not atom_name[:2].isalpha()
 
 
 def parse_pdb_atoms(path: Path) -> list[dict]:
@@ -167,6 +168,22 @@ def parse_structure(path: Path) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def _dedupe_by_design_id(found: list[tuple[str, Path]]) -> list[tuple[str, Path]]:
+    """Keep the first (sorted-order) path per design id; warn on collisions
+    instead of letting a later result silently overwrite an earlier one."""
+    by_id: dict[str, Path] = {}
+    collisions: dict[str, int] = {}
+    for design_id, path in found:
+        if design_id in by_id:
+            collisions[design_id] = collisions.get(design_id, 1) + 1
+            continue
+        by_id[design_id] = path
+    if collisions:
+        print(f"  WARNING: {len(collisions)} design id(s) matched more than one structure file; "
+              f"keeping only the first, e.g.: {list(collisions.items())[:3]}")
+    return list(by_id.items())
+
+
 def find_structures(structures_dir: Path) -> list[tuple[str, Path]]:
     nested = sorted(structures_dir.glob("**/files/result/*_predicted.cif"))
     if nested:
@@ -175,8 +192,10 @@ def find_structures(structures_dir: Path) -> list[tuple[str, Path]]:
             result_dir = cif_path.parent.parent.parent
             metadata_path = result_dir / "metadata.json"
             design_id = json.loads(metadata_path.read_text())["id"] if metadata_path.exists() else result_dir.name
+            # Same convention as compute_ipsae.py/compute_ipae.py: if a result
+            # dir has more than one *_predicted.cif, take the first (sorted).
             found.append((design_id, cif_path))
-        return found
+        return _dedupe_by_design_id(found)
 
     found = []
     for path in sorted(structures_dir.glob("**/*")):
@@ -184,7 +203,7 @@ def find_structures(structures_dir: Path) -> list[tuple[str, Path]]:
             continue
         design_id = path.stem.replace("_predicted", "")
         found.append((design_id, path))
-    return found
+    return _dedupe_by_design_id(found)
 
 
 # ---------------------------------------------------------------------------
@@ -206,39 +225,56 @@ def classify_design(
     except Exception as e:
         return design_id, None, None, f"failed to parse structure: {type(e).__name__}: {e}"
 
-    target_atoms = np.array([[a["x"], a["y"], a["z"]] for a in atoms if a["chain"] == target_chain])
-    if target_atoms.size == 0:
-        return design_id, None, None, f"no atoms found for target chain {target_chain!r}"
+    try:
+        target_atoms = np.array([[a["x"], a["y"], a["z"]] for a in atoms if a["chain"] == target_chain])
+        if target_atoms.size == 0:
+            return design_id, None, None, f"no atoms found for target chain {target_chain!r}"
 
-    binder_residues: dict[int, dict] = {}
-    for a in atoms:
-        if a["chain"] != binder_chain:
-            continue
-        res = binder_residues.setdefault(a["resnum"], {"resname": a["resname"], "coords": []})
-        res["coords"].append((a["x"], a["y"], a["z"]))
-    if not binder_residues:
-        return design_id, None, None, f"no atoms found for binder chain {binder_chain!r}"
+        binder_residues: dict[int, dict] = {}
+        for a in atoms:
+            if a["chain"] != binder_chain:
+                continue
+            res = binder_residues.setdefault(a["resnum"], {"resname": a["resname"], "coords": []})
+            res["coords"].append((a["x"], a["y"], a["z"]))
+        if not binder_residues:
+            return design_id, None, None, f"no atoms found for binder chain {binder_chain!r}"
 
-    resnums = sorted(binder_residues)
-    structure_seq = "".join(THREE_TO_ONE.get(binder_residues[r]["resname"], "X") for r in resnums)
-    if structure_seq != expected_sequence:
-        return design_id, None, None, (
-            f"binder-chain sequence from structure ({len(structure_seq)} res) does not match "
-            f"manifest sequence ({len(expected_sequence)} res) -- skipping to avoid misaligned residues"
-        )
+        resnums = sorted(binder_residues)
+        structure_seq = "".join(THREE_TO_ONE.get(binder_residues[r]["resname"], "X") for r in resnums)
+        if not isinstance(expected_sequence, str) or structure_seq != expected_sequence:
+            return design_id, None, None, (
+                f"binder-chain sequence from structure ({len(structure_seq)} res) does not match "
+                f"manifest sequence -- skipping to avoid misaligned residues"
+            )
 
-    tiers = []
-    for r in resnums:
-        atom_coords = np.array(binder_residues[r]["coords"])
-        min_dist = np.sqrt(((atom_coords[:, None, :] - target_atoms[None, :, :]) ** 2).sum(-1)).min()
-        if min_dist <= contact_cutoff:
-            tiers.append(CONTACT)
-        elif min_dist <= shell_cutoff:
-            tiers.append(SHELL)
-        else:
-            tiers.append(None)
+        # Vectorized: one (n_binder_atoms x n_target_atoms) distance matrix per
+        # design instead of one small array per residue.
+        atom_coords = []
+        atom_res_idx = []
+        for ri, r in enumerate(resnums):
+            coords = binder_residues[r]["coords"]
+            atom_coords.extend(coords)
+            atom_res_idx.extend([ri] * len(coords))
+        atom_coords = np.array(atom_coords)
+        atom_res_idx = np.array(atom_res_idx)
 
-    return design_id, tiers, resnums, None
+        diffs = atom_coords[:, None, :] - target_atoms[None, :, :]
+        atom_min_dist = np.sqrt((diffs ** 2).sum(-1)).min(axis=1)
+        res_min_dist = np.full(len(resnums), np.inf)
+        np.minimum.at(res_min_dist, atom_res_idx, atom_min_dist)
+
+        tiers = []
+        for min_dist in res_min_dist:
+            if min_dist <= contact_cutoff:
+                tiers.append(CONTACT)
+            elif min_dist <= shell_cutoff:
+                tiers.append(SHELL)
+            else:
+                tiers.append(None)
+
+        return design_id, tiers, resnums, None
+    except Exception as e:
+        return design_id, None, None, f"failed to classify: {type(e).__name__}: {e}"
 
 
 # ---------------------------------------------------------------------------
@@ -278,6 +314,12 @@ def main() -> None:
 
     model, mean, scale, _ = load_sae(args.checkpoint, device)
     pool_df = load_pool(args.data_dir).set_index("id")
+    dup_ids = pool_df.index[pool_df.index.duplicated()].unique()
+    if len(dup_ids):
+        raise ValueError(
+            f"--data-dir's manifest_combined.csv has {len(dup_ids)} duplicate id(s), e.g. "
+            f"{list(dup_ids[:3])} -- fix the manifest before running (ids must be unique)."
+        )
     acts = np.load(args.data_dir / "activations.npy", mmap_mode="r")
 
     structures = find_structures(args.structures_dir)
