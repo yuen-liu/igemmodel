@@ -34,6 +34,12 @@ training + benchmarking infrastructure for ESM-C-based binder embeddings.
   [`FEATURE_LABELING_SETUP.md`](FEATURE_LABELING_SETUP.md) -- a mechanical
   "how do I actually run it" companion to this README, including getting an
   Anthropic API key and setting a spend limit.
+- **Doing steering experiments and want to know which already-identified
+  features actually sit at the binding interface** (vs. firing on something
+  unrelated)? See [`INTERFACE_FEATURES_SETUP.md`](INTERFACE_FEATURES_SETUP.md)
+  -- maps a feature list (e.g. `feature_labels.csv`) onto each design's real
+  3D structure and reports which features fire at direct interface contacts
+  vs. nearby, per design.
 - **Just want the results, not the pipeline?** See
   [`RESULTS.md`](RESULTS.md) (every training/benchmark run, in one running
   table) and `sae/results/run4/` + `sae/results/paired/` (the committed
@@ -86,6 +92,7 @@ sae/
     feature_analysis.py     # per-feature density + max-activating examples, linear probe vs. binding metrics
     label_features.py       # LLM auto-labeling of features from their max-activating examples (optional, costs API $)
     fetch_interpro.py       # InterPro domain/family annotations per example residue, via EBI's REST API (optional)
+    extract_interface_features.py  # maps a feature list onto each design's 3D structure: which fire at the binder-target interface
     encode_pooled.py        # LEGACY/superseded -- see its own header docstring; not part of the current pipeline
   notebooks/
     sae_benchmark_analysis.ipynb              # training curves + benchmark comparison plots (early/smaller run)
@@ -98,6 +105,7 @@ sae/
   README.md                    # this file
   RESULTS.md                   # running log of every training/benchmark run's numbers
   FEATURE_LABELING_SETUP.md    # step-by-step setup + run guide for steps 6-8
+  INTERFACE_FEATURES_SETUP.md  # step-by-step setup + run guide for extract_interface_features.py (steering team)
 ```
 
 **A note on cross-folder imports**: `data.py` lives in `02_prepare_data/`
