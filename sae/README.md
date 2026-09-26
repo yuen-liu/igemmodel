@@ -328,12 +328,17 @@ revision makes `from_pretrained` fall back to **random weight
 initialization for the entire model** (all 80 blocks + norm + lm_head),
 with no hard error, only a generic "should probably TRAIN this model"
 warning easy to miss, and NaN activations by the first transformer block.
-`inject_feature.py` now pins the older, compatible revision
-(`DEFAULT_MODEL_REVISION` in the script). **`embed_esmc.py`,
-`feature_analysis.py`, and `benchmark.py` all load this same model without
-a pinned revision and are exposed to the same silent-failure risk** on any
-future run in an environment where `main` still resolves to the broken
-format -- not yet fixed there, flagged for the team.
+This is a **remote, repo-level** issue, not local to any one person's
+cache -- anyone doing a fresh (or freshly-refreshed) unpinned pull hits the
+same broken snapshot. `inject_feature.py`, `embed_esmc.py`,
+`embed_esmc_paired.py`, and `benchmark.py` (via `BIOHUB_MODEL_REVISION`)
+now all pin the older, compatible revision explicitly (each script has its
+own `DEFAULT_MODEL_REVISION`/`BIOHUB_MODEL_REVISION` constant, same commit
+hash: `a59b831785f907e96e6a246b1d142bfb76df31ee`). `feature_analysis.py`
+doesn't need this -- it only loads the SAE checkpoint via `torch.load`,
+never ESM-C's `from_pretrained` directly. Worth telling Vignesh/Andrew
+regardless, since their own local caches may currently be sitting on either
+snapshot depending on when they last pulled it.
 
 Everything above this section is *reading* features off the model
 (density, max-activating examples, probe correlations, interface-tier

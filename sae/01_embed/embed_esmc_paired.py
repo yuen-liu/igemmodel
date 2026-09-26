@@ -35,6 +35,12 @@ from transformers.models.esmc.modeling_esmc import ESMCForMaskedLM
 from transformers.models.esmc.tokenization_esmc import ESMCTokenizer
 
 DEFAULT_MODEL = "biohub/ESMC-300M"
+# biohub/ESMC-300M's "main" ref moved to a different, incompatible checkpoint
+# format (Llama-style key names) -- loading it unpinned silently falls back
+# to random init for the whole model (see embed_esmc.py's identical comment
+# and sae/06_steer/inject_feature.py's DEFAULT_MODEL_REVISION for the
+# discovery). Pin the older, compatible revision explicitly.
+DEFAULT_MODEL_REVISION = "a59b831785f907e96e6a246b1d142bfb76df31ee"
 
 VSNL1_SEQUENCE = (
     "MGKQNSKLAPEVMEDLVKSTEFNEHELKQWYKGFLKDCPSGRLNLEEFQQLYVKFFPYGDASKFAQHAFRTFDKNGDGTIDFREFICALSITSRGSFEQK"
@@ -89,6 +95,8 @@ def main() -> None:
     parser.add_argument("--target-sequence", default=VSNL1_SEQUENCE, help="Override the target sequence (default: VSNL1/vilip1)")
     parser.add_argument("--linker", default=DEFAULT_LINKER, help="Sequence inserted between binder and target (default: ESM-C's native chain-break token, '|')")
     parser.add_argument("--model-name", default=DEFAULT_MODEL)
+    parser.add_argument("--model-revision", default=DEFAULT_MODEL_REVISION,
+                         help="Pinned HF revision -- 'main' has moved to an incompatible checkpoint format, see DEFAULT_MODEL_REVISION's comment")
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--smoke-test", action="store_true", help="Only embed the first 2 sequences and print diagnostics, then exit.")
     args = parser.parse_args()
@@ -103,9 +111,9 @@ def main() -> None:
     if device.type != "cuda":
         print("WARNING: no CUDA device found, falling back to CPU (will be slow)")
 
-    print(f"Loading {args.model_name}...")
+    print(f"Loading {args.model_name} (revision {args.model_revision})...")
     tokenizer = ESMCTokenizer()
-    model = ESMCForMaskedLM.from_pretrained(args.model_name)
+    model = ESMCForMaskedLM.from_pretrained(args.model_name, revision=args.model_revision, dtype=torch.float32)
     model = model.to(device).eval().requires_grad_(False)
 
     print(

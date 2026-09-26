@@ -55,6 +55,13 @@ from data import EVAL_ONLY_SOURCES, center_scale, uncenter_unscale  # noqa: E402
 from sae_model import SparseAutoencoder  # noqa: E402
 
 BIOHUB_MODEL = "biohub/ESMC-300M"
+# BIOHUB_MODEL's "main" ref moved to a different, incompatible checkpoint
+# format (Llama-style key names) -- loading it unpinned silently falls back
+# to random init for the whole model rather than erroring (confirmed
+# 2026-09-26 in sae/06_steer/inject_feature.py's development). Pin the
+# older, compatible revision explicitly. (BIOHUB_SAE_REPO is a separate repo
+# not confirmed affected -- left unpinned.)
+BIOHUB_MODEL_REVISION = "a59b831785f907e96e6a246b1d142bfb76df31ee"
 BIOHUB_SAE_REPO = "biohub/ESMC-300M-sae-k64-codebook16384"
 LAYER = 23
 
@@ -188,9 +195,9 @@ def main():
     trained_ids = set(ckpt["train_protein_ids"].tolist())
     natural_rows = manifest[manifest["source"].isin(EVAL_ONLY_SOURCES) & ~manifest["id"].isin(trained_ids)]
 
-    print(f"Loading {BIOHUB_MODEL} + official SAE hook at layer {LAYER}...")
-    model = AutoModel.from_pretrained(BIOHUB_MODEL, device_map="auto").eval()
-    tokenizer = AutoTokenizer.from_pretrained(BIOHUB_MODEL)
+    print(f"Loading {BIOHUB_MODEL} (revision {BIOHUB_MODEL_REVISION}) + official SAE hook at layer {LAYER}...")
+    model = AutoModel.from_pretrained(BIOHUB_MODEL, revision=BIOHUB_MODEL_REVISION, device_map="auto").eval()
+    tokenizer = AutoTokenizer.from_pretrained(BIOHUB_MODEL, revision=BIOHUB_MODEL_REVISION)
     sae = AutoModel.from_pretrained(
         BIOHUB_SAE_REPO, allow_patterns=["config.json", f"layer_{LAYER}.safetensors"], device=model.device
     )
