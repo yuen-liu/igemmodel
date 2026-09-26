@@ -26,10 +26,14 @@ intervention.
 Where to inject: --interface-yaml (extract_interface_features.py's output)
 is the only source of positions -- for each candidate feature, a sample of
 designs where that feature already fires at the interface, restricted to
-the exact resnums recorded there. Resnum -> sequence-position resolution
-reuses extract_interface_features.py's own classify_design()/find_structures()
-(hard sequence-verified, not arithmetic on PDB numbering) rather than
-reimplementing that logic.
+the exact resnums recorded there. Resnum -> sequence-position resolution is
+read directly from the YAML's `positions` field rather than re-derived
+here: extract_interface_features.py already computes this mapping via a
+hard sequence-verification (not arithmetic on PDB numbering) before writing
+its output, so a design only ever appears in the YAML if that check already
+passed -- redoing the same check a second time here would just re-run the
+exact same imported function on the exact same input, not add independent
+verification.
 
 Two checks per (design, feature, position, alpha):
   - re-emergence: does the SAE code at that position come back nonzero/
@@ -63,7 +67,6 @@ Usage:
     python inject_feature.py \\
         --checkpoint ../checkpoints/best.pt --data-dir ../data-dir \\
         --interface-yaml ../05_interpret/interface_features.yaml \\
-        --structures-dir /path/to/boltz_results \\
         --feature-stats-csv ../results/run4/feature_stats.csv \\
         --features 233,1707,995 \\
         --output injection_results.csv
@@ -83,7 +86,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "05_interpret"))
 from data import center_scale  # noqa: E402
 from feature_analysis import load_pool, load_sae  # noqa: E402
-from extract_interface_features import classify_design, find_structures  # noqa: E402
 
 DEFAULT_MODEL = "biohub/ESMC-300M"
 # biohub/ESMC-300M's "main" ref moved to a different, incompatible checkpoint
@@ -164,10 +166,10 @@ def select_design_feature_pairs(
     yaml_data: dict, feature_ids: list[int], designs_per_feature: int, sampling: str, seed: int,
 ) -> dict[int, list[dict]]:
     """Returns {feature_id: [{"design_id", "tier", "contact": [...], "shell": [...],
-    "max_activation"}, ...]} -- one entry per selected design for that feature,
-    contact-tier designs preferred (sorted by max_activation desc for
-    --sampling top, shuffled for --sampling random), falling back to
-    shell-tier to fill the quota."""
+    "positions": {resnum: position, ...}, "max_activation"}, ...]} -- one entry
+    per selected design for that feature, contact-tier designs preferred
+    (sorted by max_activation desc for --sampling top, shuffled for
+    --sampling random), falling back to shell-tier to fill the quota."""
     rng = np.random.default_rng(seed)
     selected: dict[int, list[dict]] = {}
 
@@ -182,6 +184,7 @@ def select_design_feature_pairs(
                 "tier": feat_entry["tier"],
                 "contact": feat_entry["residues"].get("contact", []),
                 "shell": feat_entry["residues"].get("shell", []),
+                "positions": feat_entry["positions"],
                 "max_activation": feat_entry["max_activation"],
             })
 
@@ -206,32 +209,6 @@ def select_design_feature_pairs(
         selected[feature_id] = chosen
 
     return selected
-
-
-def resolve_positions(
-    design_id: str, structure_path: Path, expected_sequence: str,
-    target_chain: str, binder_chain: str, contact_cutoff: float, shell_cutoff: float,
-    resnums_wanted: list[int],
-) -> dict[int, int]:
-    """resnum -> 0-indexed sequence position, hard-verified via classify_design()
-    (imported from extract_interface_features.py) rather than assuming PDB
-    resnums are already 0-indexed positions."""
-    _, _, resnums, error = classify_design(
-        design_id, structure_path, expected_sequence,
-        target_chain, binder_chain, contact_cutoff, shell_cutoff,
-    )
-    if error is not None:
-        raise ValueError(f"{design_id}: could not resolve positions ({error})")
-    positions = {}
-    for resnum in resnums_wanted:
-        if resnum not in resnums:
-            raise ValueError(
-                f"{design_id}: resnum {resnum} from --interface-yaml not found in "
-                f"the re-parsed structure's resnums -- structures-dir may not match "
-                f"the one used to build --interface-yaml"
-            )
-        positions[resnum] = resnums.index(resnum)
-    return positions
 
 
 # ---------------------------------------------------------------------------
@@ -537,8 +514,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--checkpoint", type=Path, help="SAE checkpoint (required unless --smoke-test with no --feature-stats-csv)")
     parser.add_argument("--data-dir", type=Path, help="Matched activations.npy + index.csv + manifest_combined.csv pool")
-    parser.add_argument("--interface-yaml", type=Path, help="extract_interface_features.py's output YAML")
-    parser.add_argument("--structures-dir", type=Path, help="Same structures tree used to build --interface-yaml")
+    parser.add_argument("--interface-yaml", type=Path, help="extract_interface_features.py's output YAML (must include its 'positions' field)")
     parser.add_argument("--feature-stats-csv", type=Path, default=None, help="feature_analysis.py's feature_stats.csv (alpha source)")
     parser.add_argument("--output", type=Path, help="Output CSV path")
     parser.add_argument("--features", type=str, default=None, help="Comma-separated feature ids. Overrides --candidates-csv.")
@@ -561,7 +537,7 @@ def main() -> None:
         run_smoke_test(args)
         return
 
-    required = ["checkpoint", "data_dir", "interface_yaml", "structures_dir", "feature_stats_csv", "output"]
+    required = ["checkpoint", "data_dir", "interface_yaml", "feature_stats_csv", "output"]
     missing = [f"--{r.replace('_', '-')}" for r in required if getattr(args, r) is None]
     if missing:
         raise ValueError(f"Missing required argument(s) for a real run: {missing}")
@@ -596,15 +572,11 @@ def main() -> None:
     with open(args.interface_yaml) as f:
         yaml_data = yaml.safe_load(f)
     meta = yaml_data["metadata"]
-    target_chain, binder_chain = meta["target_chain"], meta["binder_chain"]
-    contact_cutoff, shell_cutoff = meta["contact_cutoff_angstrom"], meta["shell_cutoff_angstrom"]
 
     feature_ids = resolve_features(args, meta["features_checked"])
     print(f"Injecting {len(feature_ids)} feature(s): {feature_ids}")
 
     selected = select_design_feature_pairs(yaml_data, feature_ids, args.designs_per_feature, args.sampling, args.seed)
-
-    structures_by_id = dict(find_structures(args.structures_dir))
 
     rows = []
     n_skipped = 0
@@ -619,23 +591,10 @@ def main() -> None:
                 print(f"  SKIP {design_id}/{feature_id}: not in --data-dir pool")
                 n_skipped += 1
                 continue
-            if design_id not in structures_by_id:
-                print(f"  SKIP {design_id}/{feature_id}: no structure found under --structures-dir")
-                n_skipped += 1
-                continue
 
             row = pool_df.loc[design_id]
             sequence = row["sequence"]
-            resnums_wanted = sorted(set(entry["contact"]) | set(entry["shell"]))
-            try:
-                positions = resolve_positions(
-                    design_id, structures_by_id[design_id], sequence,
-                    target_chain, binder_chain, contact_cutoff, shell_cutoff, resnums_wanted,
-                )
-            except ValueError as e:
-                print(f"  SKIP {design_id}/{feature_id}: {e}")
-                n_skipped += 1
-                continue
+            positions = entry["positions"]  # resnum -> 0-indexed position, from --interface-yaml directly
 
             for resnum, position in positions.items():
                 residue_tier = "contact" if resnum in entry["contact"] else "shell"

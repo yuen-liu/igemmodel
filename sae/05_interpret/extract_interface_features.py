@@ -41,7 +41,10 @@ schemes vary), and then hard-verified: the binder chain's residues, taken
 in ascending resnum order, must spell out exactly the same sequence as
 manifest_combined.csv's `sequence` column for that id. Any mismatch (wrong
 chain id, unexpected gap, id not in the pool) skips that design with a
-recorded reason rather than silently misaligning residues to codes.
+recorded reason rather than silently misaligning residues to codes. The
+resulting resnum -> position mapping is written into the output (see
+`positions` below) so downstream consumers can act on a specific residue
+without re-parsing the structure and redoing this same verification.
 
 Usage:
     python extract_interface_features.py \\
@@ -370,9 +373,15 @@ def main() -> None:
                     continue
                 contact_res = [resnums[i] for i in fired if tiers[i] == CONTACT]
                 shell_res = [resnums[i] for i in fired if tiers[i] == SHELL]
+                # resnum -> 0-indexed sequence/activations-array position, for
+                # consumers (e.g. 06_steer/inject_feature.py) that need to act
+                # on a specific residue without re-parsing the structure and
+                # re-deriving this same already-hard-verified mapping.
+                positions = {resnums[i]: int(i) for i in fired}
                 interface_features[feature_id] = {
                     "tier": CONTACT if contact_res else SHELL,
                     "residues": {"contact": contact_res, "shell": shell_res},
+                    "positions": positions,
                     "max_activation": float(codes[fired, j].max()),
                 }
 
