@@ -98,7 +98,8 @@ sae/
     fetch_interpro.py       # InterPro domain/family annotations per example residue, via EBI's REST API (optional)
     extract_interface_features.py  # maps a feature list onto each design's 3D structure: which fire at the binder-target interface
     encode_pooled.py        # LEGACY/superseded -- see its own header docstring; not part of the current pipeline
-  06_steer/                 # PLANNED, not yet built -- see "Steering" section below
+  06_steer/
+    inject_feature.py       # injects a candidate feature's direction into ESM-C, checks it re-fires + reads MLM-logit shift (untested against real ESM-C -- see --smoke-test)
   notebooks/
     sae_benchmark_analysis.ipynb              # training curves + benchmark comparison plots (early/smaller run)
     sae_benchmark_analysis_65k.ipynb          # same, for the 65k-sequence run
@@ -312,9 +313,12 @@ minutes and this is a shared, free research service, not a bulk API.
 
 ## Steering: injecting a feature direction back into ESM-C
 
-**Status: planned, not yet built** (no `06_steer/` code exists yet as of
-this writing -- this section documents the approach so implementation can
-start directly from it rather than re-deriving the mechanics from scratch).
+**Status: written, not yet run against real ESM-C** (`06_steer/inject_feature.py`
+exists and its CPU-only logic -- feature/alpha resolution, design sampling,
+MLM-logit summarization -- is unit-tested, but `transformers.models.esmc`
+isn't installed in the dev environment it was written in, so the actual
+model-loading/hook/injection path is unverified until `--smoke-test` runs
+on real infra. See that flag before trusting a full run.).
 
 Everything above this section is *reading* features off the model
 (density, max-activating examples, probe correlations, interface-tier
@@ -447,10 +451,11 @@ mixing, multi-target training, ...), see [`RESULTS.md`](RESULTS.md).
 
 ## Open next steps
 
-- **Build `06_steer/`** -- the steering/ESM-injection step (Bridget's part
-  of the four-person steering split, see
+- **Run `06_steer/inject_feature.py --smoke-test` on real GPU infra** (Waluigi)
+  to verify the hook/block-index assumption against the actual loaded ESM-C
+  model before trusting any real injection results -- see
   [Steering](#steering-injecting-a-feature-direction-back-into-esm-c)
-  above). Currently the active priority; goal is the whole steering
+  above. Currently the active priority; goal is the whole steering
   workflow (feature ID -> injection -> structure prediction -> inverse
   folding) done before end of September.
 - **FOR ALL DRY LAB MEMBERS: try training a SAE that outperforms our current
