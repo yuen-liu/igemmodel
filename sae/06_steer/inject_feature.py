@@ -431,6 +431,13 @@ def process_row(
         post_code = sae_model.encode(post_hidden_proc)[position, feature_id].item()
     post_summary = summarize_mlm_logits(post_logits[position], aa_vocab, native_aa)
 
+    # Candidate point mutation implied by this steering result -- native
+    # sequence with just this one position swapped to whatever the MLM head
+    # now prefers there post-injection. Identical to `sequence` whenever
+    # aa_argmax_changed is False; always populated (not just on a change) so
+    # a consumer can filter on aa_argmax_changed rather than on presence.
+    mutated_sequence = sequence[:position] + post_summary["argmax_aa"] + sequence[position + 1:]
+
     return {
         "design_id": design_id, "feature_id": feature_id, "resnum": resnum, "position": position,
         "token_index": token_index, "residue_tier": residue_tier, "native_aa": native_aa,
@@ -446,6 +453,7 @@ def process_row(
         "argmax_aa_post": post_summary["argmax_aa"], "argmax_prob_post": post_summary["argmax_prob"],
         "aa_argmax_changed": pre_summary["argmax_aa"] != post_summary["argmax_aa"],
         "native_logit_shift": post_summary["native_logit"] - pre_summary["native_logit"],
+        "mutated_sequence": mutated_sequence,
     }
 
 
