@@ -10,6 +10,7 @@ vilip1_layer23_per_residue/
 vilip1_layer23_sae_outputs/
 vilip1-20260728
 sae/checkpoints/
+run4_natural_mix/
 sae/data-dir/
 sae/vilip1_layer23_65k_per_residue/
 sae/.venv/
