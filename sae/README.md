@@ -313,12 +313,27 @@ minutes and this is a shared, free research service, not a bulk API.
 
 ## Steering: injecting a feature direction back into ESM-C
 
-**Status: written, not yet run against real ESM-C** (`06_steer/inject_feature.py`
-exists and its CPU-only logic -- feature/alpha resolution, design sampling,
-MLM-logit summarization -- is unit-tested, but `transformers.models.esmc`
-isn't installed in the dev environment it was written in, so the actual
-model-loading/hook/injection path is unverified until `--smoke-test` runs
-on real infra. See that flag before trusting a full run.).
+**Status: `--smoke-test` passing on real infra (2026-09-26)** --
+`06_steer/inject_feature.py`'s hook-vs-`hidden_states[23]` alignment check
+passes exactly (max abs diff 0) on Waluigi (`esm_verify_venv`, CPU), and a
+synthetic injection causally moved a feature's SAE code from 0 to above the
+re-emergence threshold, confirming the core mechanism works end-to-end. Not
+yet run on real candidate features/designs (needs Vignesh's
+`extract_interface_features.py` output + Andrew's structures).
+
+**Important, found during verification**: `biohub/ESMC-300M`'s `main` HF
+revision silently moved to a different, incompatible checkpoint format
+(Llama-style key names) at some point -- loading it without pinning a
+revision makes `from_pretrained` fall back to **random weight
+initialization for the entire model** (all 80 blocks + norm + lm_head),
+with no hard error, only a generic "should probably TRAIN this model"
+warning easy to miss, and NaN activations by the first transformer block.
+`inject_feature.py` now pins the older, compatible revision
+(`DEFAULT_MODEL_REVISION` in the script). **`embed_esmc.py`,
+`feature_analysis.py`, and `benchmark.py` all load this same model without
+a pinned revision and are exposed to the same silent-failure risk** on any
+future run in an environment where `main` still resolves to the broken
+format -- not yet fixed there, flagged for the team.
 
 Everything above this section is *reading* features off the model
 (density, max-activating examples, probe correlations, interface-tier
