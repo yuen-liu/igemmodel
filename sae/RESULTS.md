@@ -290,3 +290,132 @@ protein sequence, not binders, and the abstract's current wording
 ("natural-protein reconstruction fidelity") is already the right claim --
 don't strengthen it. If it holds, that's a stronger result than what's
 currently written.
+
+## Steering results: feature injection (2026-09-26)
+
+First real run of `sae/06_steer/inject_feature.py` -- injecting each of 11
+candidate features' decoder direction back into `run4_natural_mix` at layer
+23 and checking (a) SAE re-emergence and (b) MLM-head amino-acid preference
+shift. Candidates and their interface positions come from Vignesh's
+`extract_interface_features.py`, run in 3 batches (full20k, ch_20260724,
+ch_20260728; 3A/8A contact/shell cutoffs) and combined via the new
+`merge_interface_yamls.py` into 64,998 designs, 0 conflicts. `--smoke-test`
+caught a real, repo-wide bug before any of this ran: `biohub/ESMC-300M`'s
+HF `main` revision silently moved to an incompatible checkpoint format,
+causing `from_pretrained` to random-init the entire model with no hard
+error (see `sae/README.md`'s "Steering" section) -- now pinned to the
+working revision everywhere it's loaded.
+
+**Run**: 11 features x 20 randomly-sampled designs each x alpha in
+{0.5, 1.0, 2.0} x mean_activation_when_active -> 7,302 rows,
+`injection_scaled.csv` (not committed, see `.gitignore`).
+
+**Dose-response confirms a real causal effect, not noise** -- both the
+mean SAE code shift and the sequence-level effect rate scale almost
+exactly linearly with alpha:
+
+| alpha_multiplier | n | re_emerged rate | aa_argmax_changed rate | mean code_delta |
+|---|---|---|---|---|
+| 0.5 | 2434 | 98.8% | 2.1% | 2.81 |
+| 1.0 | 2434 | 100.0% | 4.0% | 5.61 |
+| 2.0 | 2434 | 100.0% | 7.1% | 11.22 |
+
+**Per-feature results**, cross-referenced against `sae/results/run4/feature_labels.csv`'s
+LLM-drafted labels, sorted by how often steering actually changed the
+model's top amino-acid pick (`aa_argmax_changed`) -- the stricter,
+sequence-level bar, vs. `re_emerged` (SAE-level only, 99.6% overall and not
+very discriminating):
+
+| Feature | n candidate designs (of 64,998) | aa_argmax_changed rate | Qualifying rows (re_emerged & changed) | Label (`feature_labels.csv`) |
+|---|---|---|---|---|
+| 6869 | 74 | **27.3%** | 16 | Glycine immediately preceding lysine (G-K motif); P-loop NTPase/GTPase nucleotide-binding domains |
+| 2214 | 19 | 11.7% | 7 | All examples in GH_hydrolase_sf (Glycoside Hydrolase superfamily) |
+| 12918 | 97 | 6.9% | 5 | Phenylalanine in `TGLQG[F]L` motif; Tubulin/FtsZ GTPase domain |
+| 12588 | 18 | 6.7% | 4 | MUN domain (IPR010439) |
+| 14247 | 46,995 | 6.2% | **173** | Hydrophobic residues (I/L/F), no dominant InterPro domain |
+| 6073 | 273 | 4.0% | 3 | Leucine preceded by acidic residues (D/E) |
+| 10586 | 41 | 3.8% | 3 | Hydrophobic residues (G/L/F/I/W); secondary ionotropic glutamate receptor association |
+| 11326 | 64,997 | 3.1% | 35 | Basic residues (R/K) + Pro, before acidic/Pro-rich motifs |
+| 233 | 46,327 | 2.9% | 65 | Basic/acidic residues after an "LSE"/"LSEE" motif |
+| 1707 | 50,765 | **1.1%** | 7 | **"No clear pattern"** -- highly diverse activating residues, scattered InterPro |
+| 4657 | 728 | 0.0% | **0** | Serine after acidic residues; RTN1-4/CAPS family |
+
+Overall: 318 qualifying rows, 75 unique designs, 178 unique
+(design, position) mutation sites.
+
+**Findings:**
+1. **Specificity correlates with effect strength.** The rarest features
+   (6869: 74/64,998 designs; 2214: 19; 12918: 97; 12588: 18) all show
+   markedly higher `aa_argmax_changed` rates (6.7-27.3%) than the broad,
+   near-universal features (11326: fires in 64,997/64,998 designs, 233:
+   46,327, 1707: 50,765) -- a feature that only fires in a handful of
+   designs and reliably shifts the model's sequence preference when
+   pushed is a much sharper causal signal than one firing almost
+   everywhere.
+2. **Broad features aren't automatically noise, though** -- `14247`
+   (hydrophobic residues, fires in 46,995/64,998 designs) has a below-
+   average per-design rate (6.2%) but the largest absolute number of
+   qualifying hits (173) by sheer volume, and its label matches a
+   biologically sensible, common motif (hydrophobic packing) rather than
+   nothing. Treat "broad" and "generic/meaningless" as separate axes.
+3. **The weakest feature's own LLM label agrees with the weak effect**:
+   `1707` has both the lowest `aa_argmax_changed` rate (1.1%) and a label
+   of "No clear pattern... no consistent functional or structural motif"
+   -- two independent signals (causal steering effect, sequence-context
+   interpretation) converging on "this one is probably not real." Good
+   candidate to deprioritize.
+4. **SAE-level and sequence-level effects can dissociate**: `4657` shows
+   100% re-emergence (the SAE code reliably comes back after injection)
+   but **zero** qualifying rows -- injecting it changes the internal
+   representation the SAE reads but never once flips the MLM head's top
+   amino-acid pick at any alpha tested (up to 2x mean activation). Worth
+   trying a larger alpha before concluding it's sequence-inert.
+5. **InterPro domain labels for the strongest hits (6869: P-loop
+   NTPase/GTPase; 2214: Glycoside Hydrolase; 12918: Tubulin/FtsZ GTPase)
+   are from protein families with no known relationship to VSNL1/vilip1's
+   actual biology** (an EF-hand calcium sensor). These are very likely
+   coincidental InterPro matches against unrelated natural reference
+   sequences in the training corpus (see the InterPro coverage caveat in
+   "Feature analysis results" above), not evidence that the *design
+   generator* is doing anything related to nucleotide-binding or
+   hydrolase activity. Treat these as "real, causal, interpretable
+   sequence motifs" but not yet "confirmed biologically meaningful for
+   this target" -- that call needs Vignesh's energy profiling (H-bonds,
+   Amber/Rosetta) as an independent check, not just steering + labels.
+6. Small residual noise floor, already understood and not a new issue:
+   48/7,302 rows (0.66%) had `pre_code_pool`/`pre_code_live` disagree
+   beyond the 10% tolerance -- consistent with the pure-PyTorch
+   attention/LayerNorm fallback kernels' printed numerical-difference
+   warning (no `transformer_engine`/`xformers` installed in
+   `esm_verify_venv`) occasionally flipping a borderline feature across
+   the SAE's hard TopK cutoff. Confirmed on 2 earlier spot-checked rows:
+   discrete 0.0 vs. small-nonzero flips, not gradual drift. Does not
+   affect `code_delta`/`re_emerged` (computed entirely from same-methodology
+   live forward passes, never from the pool baseline).
+
+**Gap: this candidate list is not yet filtered by binding quality.**
+Everything above ranks features by (a) geometric proximity to the interface
+(Vignesh's contact/shell tiers -- distance to the target chain, not a
+binding-quality metric) and (b) our own causal steering effect (SAE
+re-emergence + MLM logit shift). Neither of those says whether a design is
+actually a *good* binder. The original steering plan's "profile against
+predicted hydrogen bonds and free energy (Amber relaxation / Rosetta
+energy)... features with high delta binding energy = candidates to
+extract" step -- Vignesh's other step-1 deliverable -- has not been
+cross-referenced against this data at all; no H-bond/Amber/Rosetta
+energy-delta numbers exist yet anywhere in this pipeline's output (not in
+`extract_interface_features.py`'s YAML, not in `injection_scaled.csv`).
+The specificity/dose-response ranking above is a reasonable first filter,
+but "fires near the interface and steers causally" is not the same claim
+as "affects binding energy" -- treat the current ranking as provisional
+until that energy data exists and gets merged in.
+
+**Next step**: `inject_feature.py` now also outputs a `mutated_sequence`
+column (native sequence with the flagged position swapped to
+`argmax_aa_post`) for exactly this handoff -- filter
+`re_emerged & aa_argmax_changed`, dedupe to unique `(design_id, position)`
+(178 sites), and hand those to Andrew for Boltz re-folding + ProteinMPNN
+inverse-folding (steps 3-4 of the steering pipeline). Not yet sent as of
+this writing. Ideally cross-reference against Vignesh's energy-profiling
+numbers first, once they exist, to prioritize within the 178 sites rather
+than sending all of them.
