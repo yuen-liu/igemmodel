@@ -75,6 +75,11 @@ import pandas as pd
 import torch
 import yaml
 
+# Output can run to hundreds of MB at full campaign scale (~20k+ designs) --
+# libyaml's C bindings (CSafeDumper) dump 5-10x faster than PyYAML's
+# pure-Python SafeDumper. See merge_interface_yamls.py for the matching fix.
+YAML_DUMPER = yaml.CSafeDumper if yaml.__with_libyaml__ else yaml.SafeDumper
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data"))
 from feature_analysis import load_pool, load_sae  # noqa: E402
@@ -406,7 +411,7 @@ def main() -> None:
         "skipped": skipped,
     }
     with open(args.output, "w") as f:
-        yaml.safe_dump(output, f, sort_keys=False, default_flow_style=False)
+        yaml.dump(output, f, Dumper=YAML_DUMPER, sort_keys=False, default_flow_style=False)
 
     print(f"\n{len(designs_out)}/{len(jobs)} designs had >=1 requested feature firing within {args.shell_cutoff}A of the interface")
     if skipped:

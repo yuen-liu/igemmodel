@@ -81,6 +81,12 @@ import pandas as pd
 import torch
 import yaml
 
+# --interface-yaml can run to hundreds of MB at full campaign scale (~65k
+# designs) -- PyYAML's pure-Python SafeLoader takes tens of seconds at that
+# size; libyaml's C bindings (CSafeLoader) are 5-10x faster. See
+# merge_interface_yamls.py for the same fix.
+YAML_LOADER = yaml.CSafeLoader if yaml.__with_libyaml__ else yaml.SafeLoader
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "02_prepare_data"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "05_interpret"))
@@ -570,7 +576,7 @@ def main() -> None:
 
     print(f"Loading {args.interface_yaml}...")
     with open(args.interface_yaml) as f:
-        yaml_data = yaml.safe_load(f)
+        yaml_data = yaml.load(f, Loader=YAML_LOADER)
     meta = yaml_data["metadata"]
 
     feature_ids = resolve_features(args, meta["features_checked"])
