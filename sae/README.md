@@ -40,6 +40,10 @@ training + benchmarking infrastructure for ESM-C-based binder embeddings.
   -- maps a feature list (e.g. `feature_labels.csv`) onto each design's real
   3D structure and reports which features fire at direct interface contacts
   vs. nearby, per design.
+- **Working on the steering/ESM-injection step itself** (taking a candidate
+  feature and pushing the model with it, rather than just reading features
+  off)? See [Steering: injecting a feature direction back into ESM-C](#steering-injecting-a-feature-direction-back-into-esm-c)
+  below.
 - **Just want the results, not the pipeline?** See
   [`RESULTS.md`](RESULTS.md) (every training/benchmark run, in one running
   table) and `sae/results/run4/` + `sae/results/paired/` (the committed
@@ -94,6 +98,7 @@ sae/
     fetch_interpro.py       # InterPro domain/family annotations per example residue, via EBI's REST API (optional)
     extract_interface_features.py  # maps a feature list onto each design's 3D structure: which fire at the binder-target interface
     encode_pooled.py        # LEGACY/superseded -- see its own header docstring; not part of the current pipeline
+  06_steer/                 # PLANNED, not yet built -- see "Steering" section below
   notebooks/
     sae_benchmark_analysis.ipynb              # training curves + benchmark comparison plots (early/smaller run)
     sae_benchmark_analysis_65k.ipynb          # same, for the 65k-sequence run
@@ -305,6 +310,123 @@ is sized for a few dozen candidate proteins (e.g. the linear probe's
 feature list), not the full ~25k-protein corpus -- each job takes several
 minutes and this is a shared, free research service, not a bulk API.
 
+## Steering: injecting a feature direction back into ESM-C
+
+**Status: planned, not yet built** (no `06_steer/` code exists yet as of
+this writing -- this section documents the approach so implementation can
+start directly from it rather than re-deriving the mechanics from scratch).
+
+Everything above this section is *reading* features off the model
+(density, max-activating examples, probe correlations, interface-tier
+mapping). Steering is the causal complement: deliberately push a candidate
+feature and see whether that push (a) actually reproduces itself when you
+look for it again, and (b) has a legible downstream effect -- structure,
+then sequence -- rather than just being decodable in isolation.
+
+### The four-person split
+
+1. **Feature identification + energy profiling (Vignesh).** Pull features
+   that fire on residues within ~8A of the binding interface (tighter,
+   ~2-4A, for identifying *bad* poses/negative features). Profile candidates
+   against predicted hydrogen bonds and free energy (Amber relaxation /
+   Rosetta energy). Features with high delta binding energy at the
+   interface are the candidates handed downstream.
+2. **Steering / ESM injections (this section, Bridget).** For each
+   candidate feature: re-inject its direction into the same ESM-C layer the
+   SAE was trained on, and check whether the feature re-emerges (fires
+   again, at elevated magnitude) when re-encoded -- across multiple
+   different starting embeddings, not just one, since a direction that only
+   steers cleanly in isolation but not against varied backgrounds isn't a
+   robust/generalizable feature.
+3. **Structure prediction (Andrew).** Fold the sequence(s) coming out of
+   the steering step (and/or the original for comparison) to see whether
+   the intervention actually changes the predicted binding interface/energy,
+   not just the embedding.
+4. **Inverse folding via ProteinMPNN (Andrew).** Check whether the effect
+   survives resampling the sequence given the (possibly changed) backbone --
+   i.e. whether the feature reflects a real structural/geometric property
+   rather than one memorized sequence.
+
+Step 2 (steering) only needs a trained SAE checkpoint + Vignesh's candidate
+feature list -- it doesn't depend on Andrew's structures, so it can start as
+soon as candidates exist.
+
+### Mechanics: forward hook + a decoder direction
+
+The SAE's decoder matrix `w_dec` (shape `(d_hidden, d_model)`, see
+`sae_model.py`) has one unit-norm row per feature -- `w_dec[feature_id]` is
+literally the direction in activation space that feature adds when it
+fires. Steering means adding a scaled copy of that row back into ESM-C's
+own residual stream mid-forward-pass, at the same layer (23, for vilip1)
+the SAE was trained on, then letting the rest of the model keep computing
+so you can read off the effect downstream.
+
+**Where to intervene**: a PyTorch forward hook on the transformer block
+whose output equals `outputs.hidden_states[23]` (per `embed_esmc.py`'s
+convention: `hidden_states[0]` = embedding output, `hidden_states[i]` =
+output after transformer block `i`). By standard HF indexing this should be
+the 0-indexed block `22` in the model's internal block list, but **verify
+this against the real loaded model before trusting it** -- hook a candidate
+block, compare its raw output tensor to `outputs.hidden_states[23]` from
+the same forward pass, and confirm they're identical before relying on the
+intervention. `transformers.models.esmc` isn't installed in every dev
+environment (confirm on Waluigi/wherever ESM-C actually runs).
+
+```python
+def make_steering_hook(direction_raw, alpha, positions):
+    def hook(module, inputs, output):
+        hidden = output[0] if isinstance(output, tuple) else output  # (B, L, D)
+        for b, pos_list in enumerate(positions):        # per sequence in the batch
+            hidden[b, pos_list, :] += alpha * direction_raw
+        return (hidden, *output[1:]) if isinstance(output, tuple) else hidden
+    return hook
+
+handle = transformer_block_23.register_forward_hook(
+    make_steering_hook(direction_raw, alpha, positions)
+)
+outputs = model(input_ids=..., attention_mask=..., output_hidden_states=True)  # hook fires mid-pass
+handle.remove()
+```
+
+`positions` restricts the edit to specific token indices (the interface
+residues Vignesh flagged for that feature) -- token index = residue index +
+1, since index 0 is the CLS token (`embed_esmc.py`'s convention). Every
+other position passes through untouched.
+
+**`direction_raw` -- unscaling, not un-centering.** `w_dec` lives in
+centered+scaled space (`x_proc = (x_raw - mean) * scale`, `data.py`'s
+`center_scale`), but ESM-C's own residual stream is in raw space. Adding a
+*delta* of size `alpha` in `x_proc`-space corresponds to adding
+`alpha * w_dec[feature_id] / scale` in raw space -- **divide by `scale`
+only, do not add `mean`**, because `mean` is a fixed centering offset that
+cancels out for a difference, not an absolute value:
+```
+x_proc_new = x_proc_old + alpha * w_dec[feature_id]
+x_raw_new  = x_proc_new / scale + mean
+           = x_raw_old + alpha * w_dec[feature_id] / scale
+```
+So `direction_raw = w_dec[feature_id] / scale`, computed once per feature
+from the loaded checkpoint (`load_sae()` in `feature_analysis.py` already
+returns `scale`).
+
+**Choosing `alpha`**: not an arbitrary guess -- `feature_analysis.py`
+already computed each feature's real observed activation magnitudes
+(`feature_stats.csv`/`feature_top_examples.csv`, e.g. the `max_activation`
+values also surfaced in `extract_interface_features.py`'s output YAML).
+Setting `alpha` to roughly that feature's own typical/max activation
+reproduces "this feature firing about as strongly as it naturally ever
+does" at a position where it wasn't originally firing -- a principled
+starting point to sweep from, not a fixed constant.
+
+**Two checks per (design, feature), from one forward pass**:
+- **Re-emergence**: take the steered `hidden_states[23]`, run it through
+  `center_scale` + `sae.encode()`, confirm `feature_id`'s code is
+  nonzero/elevated at the targeted positions.
+- **Sequence-level readout**: compare the MLM head's logits at the
+  targeted positions between the steered and an unsteered forward pass on
+  the same input -- a consistent shift toward a different amino acid is
+  the candidate mutation to hand to Andrew for structure prediction.
+
 ## vilip1 proof-of-pipeline results (50-epoch run)
 
 | | ours (dict=4096) | Biohub (dict=16384) |
@@ -325,6 +447,12 @@ mixing, multi-target training, ...), see [`RESULTS.md`](RESULTS.md).
 
 ## Open next steps
 
+- **Build `06_steer/`** -- the steering/ESM-injection step (Bridget's part
+  of the four-person steering split, see
+  [Steering](#steering-injecting-a-feature-direction-back-into-esm-c)
+  above). Currently the active priority; goal is the whole steering
+  workflow (feature ID -> injection -> structure prediction -> inverse
+  folding) done before end of September.
 - **FOR ALL DRY LAB MEMBERS: try training a SAE that outperforms our current
   baseline SAE** (results by Bridget & Andrew in RESULTS.md)
 - **Apply this same pipeline to UCH-L1, S100B, and B-FABP** -- the actual
