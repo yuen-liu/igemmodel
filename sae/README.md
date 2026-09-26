@@ -98,7 +98,8 @@ sae/
     fetch_interpro.py       # InterPro domain/family annotations per example residue, via EBI's REST API (optional)
     extract_interface_features.py  # maps a feature list onto each design's 3D structure: which fire at the binder-target interface
     encode_pooled.py        # LEGACY/superseded -- see its own header docstring; not part of the current pipeline
-  06_steer/                 # PLANNED, not yet built -- see "Steering" section below
+  06_steer/
+    inject_feature.py       # injects a candidate feature's direction into ESM-C, checks it re-fires + reads MLM-logit shift (untested against real ESM-C -- see --smoke-test)
   notebooks/
     sae_benchmark_analysis.ipynb              # training curves + benchmark comparison plots (early/smaller run)
     sae_benchmark_analysis_65k.ipynb          # same, for the 65k-sequence run
@@ -312,9 +313,32 @@ minutes and this is a shared, free research service, not a bulk API.
 
 ## Steering: injecting a feature direction back into ESM-C
 
-**Status: planned, not yet built** (no `06_steer/` code exists yet as of
-this writing -- this section documents the approach so implementation can
-start directly from it rather than re-deriving the mechanics from scratch).
+**Status: `--smoke-test` passing on real infra (2026-09-26)** --
+`06_steer/inject_feature.py`'s hook-vs-`hidden_states[23]` alignment check
+passes exactly (max abs diff 0) on Waluigi (`esm_verify_venv`, CPU), and a
+synthetic injection causally moved a feature's SAE code from 0 to above the
+re-emergence threshold, confirming the core mechanism works end-to-end. Not
+yet run on real candidate features/designs (needs Vignesh's
+`extract_interface_features.py` output + Andrew's structures).
+
+**Important, found during verification**: `biohub/ESMC-300M`'s `main` HF
+revision silently moved to a different, incompatible checkpoint format
+(Llama-style key names) at some point -- loading it without pinning a
+revision makes `from_pretrained` fall back to **random weight
+initialization for the entire model** (all 80 blocks + norm + lm_head),
+with no hard error, only a generic "should probably TRAIN this model"
+warning easy to miss, and NaN activations by the first transformer block.
+This is a **remote, repo-level** issue, not local to any one person's
+cache -- anyone doing a fresh (or freshly-refreshed) unpinned pull hits the
+same broken snapshot. `inject_feature.py`, `embed_esmc.py`,
+`embed_esmc_paired.py`, and `benchmark.py` (via `BIOHUB_MODEL_REVISION`)
+now all pin the older, compatible revision explicitly (each script has its
+own `DEFAULT_MODEL_REVISION`/`BIOHUB_MODEL_REVISION` constant, same commit
+hash: `a59b831785f907e96e6a246b1d142bfb76df31ee`). `feature_analysis.py`
+doesn't need this -- it only loads the SAE checkpoint via `torch.load`,
+never ESM-C's `from_pretrained` directly. Worth telling Vignesh/Andrew
+regardless, since their own local caches may currently be sitting on either
+snapshot depending on when they last pulled it.
 
 Everything above this section is *reading* features off the model
 (density, max-activating examples, probe correlations, interface-tier
@@ -447,10 +471,11 @@ mixing, multi-target training, ...), see [`RESULTS.md`](RESULTS.md).
 
 ## Open next steps
 
-- **Build `06_steer/`** -- the steering/ESM-injection step (Bridget's part
-  of the four-person steering split, see
+- **Run `06_steer/inject_feature.py --smoke-test` on real GPU infra** (Waluigi)
+  to verify the hook/block-index assumption against the actual loaded ESM-C
+  model before trusting any real injection results -- see
   [Steering](#steering-injecting-a-feature-direction-back-into-esm-c)
-  above). Currently the active priority; goal is the whole steering
+  above. Currently the active priority; goal is the whole steering
   workflow (feature ID -> injection -> structure prediction -> inverse
   folding) done before end of September.
 - **FOR ALL DRY LAB MEMBERS: try training a SAE that outperforms our current

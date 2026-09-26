@@ -84,6 +84,16 @@ from transformers.models.esmc.modeling_esmc import ESMCForMaskedLM
 from transformers.models.esmc.tokenization_esmc import ESMCTokenizer
 
 DEFAULT_MODEL = "biohub/ESMC-300M"
+# biohub/ESMC-300M's "main" ref moved to a different, incompatible checkpoint
+# format (Llama-style key names: esmc.layers.N.self_attn.q_proj.weight, etc.)
+# at some point after this transformers.models.esmc integration was written
+# against the OLDER key naming (esmc.transformer.blocks.N.attn.k_ln.weight,
+# etc.) -- loading "main" silently falls back to random init for every
+# weight (confirmed 2026-09-26 in sae/06_steer/inject_feature.py's
+# development: all 80 blocks + norm + lm_head "not initialized", NaN by
+# layer 1) rather than erroring. Pin the older, compatible revision
+# explicitly rather than trusting "main".
+DEFAULT_MODEL_REVISION = "a59b831785f907e96e6a246b1d142bfb76df31ee"
 
 
 def embed_batch(
@@ -295,6 +305,8 @@ def main() -> None:
         "a directory (activations.npy + index.csv written inside it).",
     )
     parser.add_argument("--model-name", default=DEFAULT_MODEL)
+    parser.add_argument("--model-revision", default=DEFAULT_MODEL_REVISION,
+                         help="Pinned HF revision -- 'main' has moved to an incompatible checkpoint format, see DEFAULT_MODEL_REVISION's comment")
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument(
         "--smoke-test",
@@ -317,9 +329,9 @@ def main() -> None:
     if device.type != "cuda":
         print("WARNING: no CUDA device found, falling back to CPU (will be slow)")
 
-    print(f"Loading {args.model_name}...")
+    print(f"Loading {args.model_name} (revision {args.model_revision})...")
     tokenizer = ESMCTokenizer()
-    model = ESMCForMaskedLM.from_pretrained(args.model_name)
+    model = ESMCForMaskedLM.from_pretrained(args.model_name, revision=args.model_revision, dtype=torch.float32)
     model = model.to(device).eval().requires_grad_(False)
 
     if args.per_residue:

@@ -44,6 +44,10 @@ pres_ZQ4mh1P7FGiBS6xh3ISM:
       residues:
         contact: [12, 13]        # <=5A from the target -- direct interface residues
         shell: [50]              # 5-10A from the target -- nearby, not direct contact
+      positions:                 # resnum -> 0-indexed position (activations.npy row), for
+        12: 11                   # tools that act on a specific residue without re-parsing
+        13: 12                   # the structure themselves (e.g. steering/injection scripts)
+        50: 49
       max_activation: 8.42
 ```
 
@@ -166,6 +170,7 @@ designs:
       233:
         tier: contact
         residues: {contact: [12, 13], shell: [50]}
+        positions: {12: 11, 13: 12, 50: 49}
         max_activation: 8.42
 
 skipped:

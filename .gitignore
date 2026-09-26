@@ -10,6 +10,7 @@ vilip1_layer23_per_residue/
 vilip1_layer23_sae_outputs/
 vilip1-20260728
 sae/checkpoints/
+run4_natural_mix/
 sae/data-dir/
 sae/vilip1_layer23_65k_per_residue/
 sae/.venv/
@@ -21,6 +22,10 @@ sae/results/*
 !sae/results/run4/*.csv
 !sae/results/paired/
 !sae/results/paired/*.csv
+# raw extract_interface_features.py/merge_interface_yamls.py outputs -- can
+# run to hundreds of MB at full campaign scale, scp'd down for local
+# inspection, not meant to be committed (unlike the small analysis CSVs above)
+sae/results/run4/yamls/
 REG3A_final_25_33/
 REG3A_final_45_57/
 
