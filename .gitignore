@@ -22,6 +22,10 @@ sae/results/*
 !sae/results/run4/*.csv
 !sae/results/paired/
 !sae/results/paired/*.csv
+# raw extract_interface_features.py/merge_interface_yamls.py outputs -- can
+# run to hundreds of MB at full campaign scale, scp'd down for local
+# inspection, not meant to be committed (unlike the small analysis CSVs above)
+sae/results/run4/yamls/
 REG3A_final_25_33/
 REG3A_final_45_57/
 
