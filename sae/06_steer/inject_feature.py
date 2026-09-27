@@ -404,12 +404,47 @@ def compute_pool_baseline_code(pool_df: pd.DataFrame, acts: np.ndarray, mean, sc
 # ---------------------------------------------------------------------------
 
 
+def make_control_direction(mode, direction_raw, sae_model, scale, exclude, live_features, rng, device):
+    """A norm-matched null direction for `direction_raw`.
+
+    Injecting any sufficiently large vector into the residual stream perturbs
+    the MLM head, so a dose-response in `aa_argmax_changed` is only evidence
+    that the *feature* is causally engaged if a direction carrying no feature
+    semantics, at identical norm and identical alpha, does not produce it.
+
+    "random"        -- isotropic Gaussian, rescaled to ||direction_raw||.
+                       Controls for perturbation magnitude alone.
+    "other-feature" -- another live SAE decoder row, rescaled the same way.
+                       Also controls for "is a real decoder direction",
+                       i.e. lying in the subspace the SAE actually spans.
+
+    Resampled per row so results average over draws rather than hinging on
+    one unlucky vector.
+    """
+    if mode == "random":
+        control = torch.randn(direction_raw.shape, generator=rng, device="cpu").to(device)
+    elif mode == "other-feature":
+        pool = [f for f in live_features if f not in exclude]
+        if not pool:
+            raise ValueError("No live non-candidate feature available for --control-directions other-feature")
+        other = pool[int(torch.randint(len(pool), (1,), generator=rng).item())]
+        control = (sae_model.w_dec[other].detach() / scale).to(device)
+    else:
+        raise ValueError(f"Unknown control direction mode: {mode}")
+
+    norm = control.norm()
+    if float(norm) == 0.0:
+        raise ValueError(f"Control direction for mode {mode} has zero norm")
+    return control * (direction_raw.norm() / norm)
+
+
 def process_row(
     design_id, feature_id, resnum, position, residue_tier, design_max_activation,
     alpha_multiplier, alpha, mean_activation_when_active,
     sequence, native_aa, aa_vocab,
     model, tokenizer, device, layer, sae_model, mean, scale, direction_raw,
     pool_df, acts, pool_live_tolerance, reemergence_threshold,
+    direction_mode="feature",
 ) -> dict:
     token_index = position + 1
 
@@ -440,6 +475,7 @@ def process_row(
 
     return {
         "design_id": design_id, "feature_id": feature_id, "resnum": resnum, "position": position,
+        "direction_mode": direction_mode,
         "token_index": token_index, "residue_tier": residue_tier, "native_aa": native_aa,
         "design_max_activation": design_max_activation,
         "alpha_multiplier": alpha_multiplier, "mean_activation_when_active": mean_activation_when_active, "alpha": alpha,
@@ -538,6 +574,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--alpha-multipliers", type=str, default="1.0", help="Comma-separated multipliers of mean_activation_when_active")
     parser.add_argument("--alpha-absolute", type=float, default=None, help="Override: use this exact alpha, ignoring --feature-stats-csv/--alpha-multipliers")
+    parser.add_argument("--control-directions", type=str, default="",
+                        help="Comma-separated null conditions to run alongside the real feature direction: "
+                             "'random' (norm-matched Gaussian) and/or 'other-feature' (norm-matched live decoder "
+                             "row). Every condition is evaluated at the same site and same alpha as the real "
+                             "injection, so conditions are exactly paired; filter the output on direction_mode.")
     parser.add_argument("--reemergence-threshold", type=float, default=0.5)
     parser.add_argument("--pool-live-tolerance", type=float, default=0.1)
     parser.add_argument("--layer", type=int, default=23, help="hidden_states index the SAE was trained on")
@@ -592,6 +633,23 @@ def main() -> None:
 
     selected = select_design_feature_pairs(yaml_data, feature_ids, args.designs_per_feature, args.sampling, args.seed)
 
+    control_modes = [m.strip() for m in args.control_directions.split(",") if m.strip()]
+    unknown = [m for m in control_modes if m not in ("random", "other-feature")]
+    if unknown:
+        raise ValueError(f"Unknown --control-directions value(s): {unknown}")
+    direction_modes = ["feature"] + control_modes
+    if control_modes:
+        print(f"Paired null condition(s) per site/alpha: {control_modes}")
+    # Separate generator so adding controls does not perturb --seed-driven design sampling.
+    control_rng = torch.Generator().manual_seed(args.seed + 1)
+    if "dead" in feature_stats.columns:
+        # Must be a real bool dtype -- bool("False") is True, which would
+        # silently empty the control pool.
+        assert feature_stats["dead"].dtype == bool, f"'dead' column is {feature_stats['dead'].dtype}, expected bool"
+        live_features = [f for f in feature_stats.index if not feature_stats.loc[f, "dead"]]
+    else:
+        live_features = list(feature_stats.index)
+
     rows = []
     n_skipped = 0
     for feature_id in feature_ids:
@@ -614,15 +672,21 @@ def main() -> None:
                 residue_tier = "contact" if resnum in entry["contact"] else "shell"
                 native_aa = sequence[position]
                 for alpha_multiplier, alpha in alphas:
-                    rows.append(process_row(
-                        design_id, feature_id, resnum, position, residue_tier, entry["max_activation"],
-                        alpha_multiplier, alpha, mean_active,
-                        sequence, native_aa, aa_vocab,
-                        model, tokenizer, device, args.layer, sae_model, mean, scale, direction_raw,
-                        pool_df, acts, args.pool_live_tolerance, args.reemergence_threshold,
-                    ))
-                    if len(rows) % 50 == 0:
-                        print(f"  ...{len(rows)} row(s) processed")
+                    for direction_mode in direction_modes:
+                        direction = direction_raw if direction_mode == "feature" else make_control_direction(
+                            direction_mode, direction_raw, sae_model, scale,
+                            set(feature_ids), live_features, control_rng, device,
+                        )
+                        rows.append(process_row(
+                            design_id, feature_id, resnum, position, residue_tier, entry["max_activation"],
+                            alpha_multiplier, alpha, mean_active,
+                            sequence, native_aa, aa_vocab,
+                            model, tokenizer, device, args.layer, sae_model, mean, scale, direction,
+                            pool_df, acts, args.pool_live_tolerance, args.reemergence_threshold,
+                            direction_mode=direction_mode,
+                        ))
+                        if len(rows) % 50 == 0:
+                            print(f"  ...{len(rows)} row(s) processed")
 
     out_df = pd.DataFrame(rows)
     out_df.to_csv(args.output, index=False)
@@ -630,6 +694,24 @@ def main() -> None:
     print(f"\nWrote {len(out_df)} row(s) to {args.output} ({n_skipped} design/feature pair(s) skipped)")
     if not out_df.empty:
         print(f"Re-emergence rate: {out_df['re_emerged'].mean():.1%}")
+        if out_df["direction_mode"].nunique() > 1:
+            # The comparison the steering claim rests on: a dose-response in the
+            # real feature direction that the norm-matched nulls do not show.
+            print("\naa_argmax_changed by alpha_multiplier x direction_mode:")
+            table = out_df.pivot_table(
+                index="alpha_multiplier", columns="direction_mode",
+                values="aa_argmax_changed", aggfunc="mean",
+            )
+            counts = out_df.pivot_table(
+                index="alpha_multiplier", columns="direction_mode",
+                values="aa_argmax_changed", aggfunc="size",
+            )
+            for alpha_mult in table.index:
+                cells = "  ".join(
+                    f"{mode}={table.loc[alpha_mult, mode]:6.1%} (n={int(counts.loc[alpha_mult, mode])})"
+                    for mode in table.columns
+                )
+                print(f"  alpha {alpha_mult:>4}x   {cells}")
         n_inconsistent = (~out_df["pre_pool_live_consistent"]).sum()
         if n_inconsistent:
             print(f"WARNING: {n_inconsistent} row(s) had pre_code_pool/pre_code_live disagree beyond tolerance "
