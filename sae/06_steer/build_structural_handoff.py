@@ -40,16 +40,21 @@ def main() -> None:
     if not rows:
         raise SystemExit(f"No rows for feature {args.feature} at resnum >= {args.min_resnum}")
 
-    best: dict[str, tuple] = {}
+    rng = random.Random(args.seed)
+
+    by_design: dict[str, list] = {}
     for row in rows:
         rank = int(row["selection_reason"].rsplit("rank", 1)[1])
-        key = (rank, float(row["alpha_multiplier"]), int(row["resnum"]))
-        if row["design_id"] not in best or key < best[row["design_id"]][0]:
-            best[row["design_id"]] = (key, row)
+        by_design.setdefault(row["design_id"], []).append(
+            ((rank, float(row["alpha_multiplier"])), row)
+        )
 
-    sites = [row for _, row in sorted(best.values(), key=lambda kv: kv[1]["design_id"])]
-
-    rng = random.Random(args.seed)
+    sites = []
+    for design in sorted(by_design):
+        ranked = by_design[design]
+        floor = min(key for key, _ in ranked)
+        tied = [row for key, row in ranked if key == floor]
+        sites.append(rng.choice(tied))
     fasta, controls = [], []
     for row in sites:
         position = int(row["position"])
