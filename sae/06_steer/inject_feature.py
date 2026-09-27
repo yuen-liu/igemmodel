@@ -358,7 +358,8 @@ def build_canonical_aa_vocab(tokenizer) -> list[tuple[str, int]]:
     return lm_vocab[CANONICAL_AA_VOCAB_SLICE]
 
 
-def summarize_mlm_logits(logits_at_position: torch.Tensor, aa_vocab: list[tuple[str, int]], native_aa: str) -> dict:
+def summarize_mlm_logits(logits_at_position: torch.Tensor, aa_vocab: list[tuple[str, int]], native_aa: str,
+                         top_k: int = 5) -> dict:
     aa_chars = [c for c, _ in aa_vocab]
     aa_token_ids = [t for _, t in aa_vocab]
     restricted = logits_at_position[aa_token_ids]
@@ -378,9 +379,17 @@ def summarize_mlm_logits(logits_at_position: torch.Tensor, aa_vocab: list[tuple[
     else:
         native_rank, native_prob, native_logit = None, float("nan"), float("nan")
 
+    # Full ranking is already computed above, so top-k is free. Needed because
+    # the argmax alone cannot express what a multi-residue-motif feature wants:
+    # for an anchor-plus-context feature the argmax often returns the context
+    # residue and deletes the anchor (see RESULTS.md's anchor-residue section).
+    # Downstream selection picks the best top-k candidate that preserves it.
+    k = min(top_k, len(ranked_chars))
     return {
         "argmax_aa": argmax_aa, "argmax_prob": argmax_prob,
         "native_rank": native_rank, "native_prob": native_prob, "native_logit": native_logit,
+        "top_k_aa": "".join(ranked_chars[:k]),
+        "top_k_probs": ";".join(f"{float(p):.4f}" for p in ranked_probs[:k]),
     }
 
 
@@ -444,7 +453,7 @@ def process_row(
     sequence, native_aa, aa_vocab,
     model, tokenizer, device, layer, sae_model, mean, scale, direction_raw,
     pool_df, acts, pool_live_tolerance, reemergence_threshold,
-    direction_mode="feature",
+    direction_mode="feature", top_k=5,
 ) -> dict:
     token_index = position + 1
 
@@ -452,7 +461,7 @@ def process_row(
     pre_hidden_proc = center_scale(pre_hidden.to(device), mean, scale)
     with torch.no_grad():
         pre_code_live = sae_model.encode(pre_hidden_proc)[position, feature_id].item()
-    pre_summary = summarize_mlm_logits(pre_logits[position], aa_vocab, native_aa)
+    pre_summary = summarize_mlm_logits(pre_logits[position], aa_vocab, native_aa, top_k)
 
     pre_code_pool = compute_pool_baseline_code(pool_df, acts, mean, scale, sae_model, device, design_id, feature_id, position)
     pre_pool_live_consistent = bool(
@@ -464,7 +473,7 @@ def process_row(
     post_hidden_proc = center_scale(post_hidden.to(device), mean, scale)
     with torch.no_grad():
         post_code = sae_model.encode(post_hidden_proc)[position, feature_id].item()
-    post_summary = summarize_mlm_logits(post_logits[position], aa_vocab, native_aa)
+    post_summary = summarize_mlm_logits(post_logits[position], aa_vocab, native_aa, top_k)
 
     # Candidate point mutation implied by this steering result -- native
     # sequence with just this one position swapped to whatever the MLM head
@@ -487,6 +496,8 @@ def process_row(
         "argmax_aa_pre": pre_summary["argmax_aa"], "argmax_prob_pre": pre_summary["argmax_prob"],
         "native_prob_post": post_summary["native_prob"],
         "argmax_aa_post": post_summary["argmax_aa"], "argmax_prob_post": post_summary["argmax_prob"],
+        "top_k_aa_pre": pre_summary["top_k_aa"],
+        "top_k_aa_post": post_summary["top_k_aa"], "top_k_probs_post": post_summary["top_k_probs"],
         "aa_argmax_changed": pre_summary["argmax_aa"] != post_summary["argmax_aa"],
         "native_logit_shift": post_summary["native_logit"] - pre_summary["native_logit"],
         "mutated_sequence": mutated_sequence,
@@ -579,6 +590,10 @@ def main() -> None:
                              "'random' (norm-matched Gaussian) and/or 'other-feature' (norm-matched live decoder "
                              "row). Every condition is evaluated at the same site and same alpha as the real "
                              "injection, so conditions are exactly paired; filter the output on direction_mode.")
+    parser.add_argument("--top-k", type=int, default=5,
+                        help="How many ranked amino acids to record per position (top_k_aa_post). "
+                             "Free -- the full ranking is already computed. Downstream anchor-aware "
+                             "selection needs k>1; the argmax alone deletes anchor residues.")
     parser.add_argument("--reemergence-threshold", type=float, default=0.5)
     parser.add_argument("--pool-live-tolerance", type=float, default=0.1)
     parser.add_argument("--layer", type=int, default=23, help="hidden_states index the SAE was trained on")
@@ -683,7 +698,7 @@ def main() -> None:
                             sequence, native_aa, aa_vocab,
                             model, tokenizer, device, args.layer, sae_model, mean, scale, direction,
                             pool_df, acts, args.pool_live_tolerance, args.reemergence_threshold,
-                            direction_mode=direction_mode,
+                            direction_mode=direction_mode, top_k=args.top_k,
                         ))
                         if len(rows) % 50 == 0:
                             print(f"  ...{len(rows)} row(s) processed")
