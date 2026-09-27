@@ -476,16 +476,57 @@ above) -- a real energetic association without (yet-demonstrated)
 sequence-level causality; worth a higher-alpha steering re-test before
 concluding it's uninteresting, not immediate hand-off material.
 
-**Revised candidate priority for hand-off, energy + steering combined**:
-`12588` > `6073` ≈ `10586` as the strongest balanced candidates;
-`4657` as an energy-only candidate pending a steering re-test; `6869` and
-`2214` demoted despite their steering excitement, given the energy
-evidence now argues against them being real binding-relevant features.
+**Correction (2026-09-27): the raw per-feature averages above are confounded, and a
+proper multi-feature regression changes the priority.** Designs carry
+several candidate features at once (the per-feature groups overlap), so a
+feature's raw mean `dE_interaction` partly reflects whichever *other*
+features/binder-length characteristics its designs happen to also have,
+not necessarily its own effect. Ran a regression of `dE_interaction` on
+every feature's presence AND activation-strength (per-SD, for designs
+where present) simultaneously, controlling for binder length, robust SEs,
+BH-FDR correction across all terms (`energy_bench/feature_energy_regression.py`,
+`feature_energy_stats.py`). R²=0.26 (adj. 0.22).
+
+**Holds up robustly (q<=0.01)**: `233` activation (-13.5 kcal/mol/SD),
+`11326` activation (-12.9 kcal/mol/SD), `6073` presence (-30.1 kcal/mol).
+**Borderline (q~0.06)**: `14247` activation, `4657` presence, `10586`
+presence -- all still pointing toward more favorable binding.
+**No independent effect once confounds are controlled**: `1707`, `2214`,
+`6869`, `12588`, `12918` -- including `12588`, which had looked like the
+best raw-average candidate above; that raw signal was apparently mostly
+overlap with other features/binder length, not `12588`'s own effect.
+**No feature was linked to *worse* binding** -- `6869`/`2214`'s
+unfavorable raw averages (discussed above) don't hold up as a real
+"hurts binding" effect either once confounds are controlled; the honest
+read is "no detected effect," not "detected harm." (Caveat: `233`'s and
+`14247`'s *presence* coefficients are unreliable -- only ~30 designs lack
+either feature, mostly the same 30, r=0.92 between their absence, so the
+model can't separate them there; their *activation* coefficients are
+reliable, estimated from the ~440 designs that have them.)
+
+**Revised candidate priority for hand-off** (energy regression + steering,
+superseding the raw-average-based priority above): **`6073`** (solid
+presence effect + real steering signal) is the clearest single candidate.
+`10586` and `4657` are borderline-significant presence effects, both
+still steering-consistent (`4657` pending its higher-alpha retest, see
+below) -- reasonable secondary candidates. `233` and `11326`'s activation
+effects are the most statistically robust finding overall, but both are
+near-universal (fire in ~93-100% of designs), so they're not useful as
+"introduce this feature into a new design" candidates the way rare
+features are -- their actionable form is different: steering to *increase*
+activation at a position where one of them already fires in an otherwise-good
+design, as a refinement lever, not a new mutation to introduce. `12588`
+is **dropped** from the priority list (looked best on raw averages, no
+independent effect in the regression). `6869`/`2214` remain deprioritized,
+now on more precise grounds ("no detected effect" rather than "detected
+harm").
 
 **Next step**: `inject_feature.py` outputs a `mutated_sequence` column
 (native sequence with the flagged position swapped to `argmax_aa_post`)
 for exactly this handoff. Filter `re_emerged & aa_argmax_changed`
-**restricted to `12588`/`6073`/`10586`** (not the full 178-site list --
-see the revised priority above), and hand those to Andrew for Boltz
+**restricted to `6073`/`10586`/`4657`** (not `12588`, per the correction
+above; not the full 178-site list), and hand those to Andrew for Boltz
 re-folding + ProteinMPNN inverse-folding (steps 3-4 of the steering
-pipeline). Not yet sent as of this writing.
+pipeline). Not yet sent as of this writing. `4657`'s inclusion depends on
+its higher-alpha retest (in progress) actually showing a steering effect --
+drop it if that comes back null too.
