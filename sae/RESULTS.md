@@ -423,6 +423,23 @@ activation-vs-energy correlation, but likely underpowered (n=18-57 vs.
 `233`'s 444) rather than genuinely null -- worth a larger sample before
 concluding they lack a dose-dependent signal.
 
+**Checked whether this dose-dependence also shows up on the steering
+side, using existing `injection_scaled.csv` data (no new run needed)**:
+for feature 233, correlating each design's baseline activation strength
+(`design_max_activation`) against the steering outcome. Much weaker than
+the energy-side result -- `code_delta` (does re-injection re-activate the
+feature) shows ~zero correlation (r=0.000, p=0.99), and `aa_argmax_changed`
+(does steering flip the model's amino-acid pick -- the practically
+important outcome) shows no significant difference in baseline activation
+between designs where it flipped vs. didn't (p=0.62). Only
+`native_logit_shift` shows a small significant effect (r=-0.13,
+p=1.1e-9, n=2208 rows / 20 unique designs -- all already high-activation
+"top" picks from the original sampling, limiting dynamic range). Energy
+dose-dependence and steering dose-dependence are measuring genuinely
+different things (a correlational structural signal vs. a causal
+intervention response) and don't need to track each other -- they don't,
+here.
+
 **Cross-referenced against the steering results** (`injection_scaled.csv`), per feature:
 
 | Feature | n designs (energy) | Mean dE_interaction | Mean H-bonds | aa_argmax_changed rate (steering) | Qualifying rows |
