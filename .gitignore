@@ -47,3 +47,6 @@ conference/*.out
 conference/*.fls
 conference/*.fdb_latexmk
 conference/*.synctex.gz
+
+## energy profiling data dirs
+energy_sample
