@@ -361,6 +361,15 @@ exactly linearly with alpha:
 | 1.0 | 2434 | 100.0% | 4.0% | 5.61 |
 | 2.0 | 2434 | 100.0% | 7.1% | 11.22 |
 
+> **SUPERSEDED (2026-09-27) -- do not quote this table as evidence of a
+> causal effect.** This run had no null condition. With norm-matched
+> controls added, ~2/3 of the `aa_argmax_changed` dose-response is
+> reproduced by a random direction of the same norm; `re_emerged` is
+> near-tautological (98.5% of injected sites were already active before
+> injection); and `code_delta` linearity is forced by the geometry of
+> injecting `w_dec[f]` and then encoding. See "Controlled feature
+> injection" at the end of this file.
+
 **Per-feature results**, cross-referenced against `sae/results/run4/feature_labels.csv`'s
 LLM-drafted labels, sorted by how often steering actually changed the
 model's top amino-acid pick (`aa_argmax_changed`) -- the stricter,
@@ -608,3 +617,129 @@ feature requires. A single-position argmax readout cannot express "keep
 the serine, acidify the neighbours," which is what these features
 actually want. Revisit the readout before drawing conclusions about
 whether steering transfers through structure.
+
+## Controlled feature injection (2026-09-27)
+
+**The headline: injection causally steers residue preference for 1 of 11
+features tested; every earlier steering number was uncontrolled and ~2/3
+of the apparent effect is perturbation magnitude.**
+
+`06_steer/inject_feature.py --control-directions random,other-feature` adds
+two paired null conditions, evaluated at the same design/site/alpha as the
+real injection: `random` (isotropic Gaussian rescaled to `||w_dec[f]/scale||`,
+controls for perturbation magnitude) and `other-feature` (another live
+decoder row at matched norm, also controls for lying in the SAE's span).
+Conditions are exactly paired, so the right test is **exact McNemar on
+discordant pairs**, not a two-proportion test.
+
+**Dose-response, 11 features, 24,831 rows, zero skips:**
+
+| alpha | feature | random | other-feature |
+|---|---|---|---|
+| 0.5x | 3.7% | -- | -- |
+| 1.0x | 5.4% | -- | -- |
+| 2.0x | **8.8%** | **6.4%** | -- |
+
+At 2x the feature direction changes 8.8% of sites and a norm-matched random
+vector changes 6.4%. **Only ~1/3 of the effect is feature semantics**;
+reading the feature curve alone overstates it ~3x. This replicated across
+two different pools (25k-pool run: 8.6% vs 5.7%), so it is robust.
+
+**Per-feature, 0.5-2x, feature vs norm-matched random (paired McNemar):**
+
+| Feature | density | n pairs | feature | random | excess | p |
+|---|---|---|---|---|---|---|
+| **233** | 0.42 | 2184 | 5.0% | 2.2% | **+2.8pp** | **5.0e-09** |
+| 14247 | 0.76 | 2865 | 8.2% | 6.9% | +1.3pp | 0.022 |
+| 11326 | 0.44 | 1680 | 5.2% | 4.3% | +1.0pp | 0.11 |
+| 1707 | 0.15 | 867 | 1.6% | 1.2% | +0.5pp | 0.42 |
+| 4657 | 0.0099 | 261 | 1.5% | 2.7% | -1.1pp | 0.51 |
+| 6869 | 0.0001 | 66 | 13.6% | 10.6% | +3.0pp | 0.73 |
+| 10586 | 0.0006 | 78 | 9.0% | 11.5% | -2.6pp | 0.75 |
+| 6073 | 0.0004 | 84 | 8.3% | 10.7% | -2.4pp | 0.75 |
+| 2214 | 0.0002 | 60 | 15.0% | 11.7% | +3.3pp | 0.77 |
+| 12588 | 0.0002 | 60 | 6.7% | 5.0% | +1.7pp | 1.00 |
+| 12918 | 0.0004 | 72 | 12.5% | 13.9% | -1.4pp | 1.00 |
+
+Bonferroni for 11 comparisons is p < 0.0045, so **only `233` survives**.
+Pooled across all 11 the gap is 6.00% vs 4.60% random (p=5.1e-07) and 4.76%
+other-feature (p=9.0e-06), but that pooled significance is carried almost
+entirely by `233`.
+
+**High-alpha arm (4x/8x), 1,830 rows:** `4657` is null at 4x (3.8% vs 3.8%,
+p=1.00) and nominally positive at 8x (13.1% vs 5.5%, n=183, 20/6 discordant,
+p=0.0094 -- but 1 of 6 feature-by-alpha tests, so Bonferroni puts it at
+0.056). `6073` and `10586` are negative or null at both doses. The
+uncontrolled `injection_4657_highalpha.csv` magnitudes reproduce (3.8% at
+4x, 13.1% at 8x vs the 5.2%/11.2% reported); what they lacked was the
+control showing only the 8x half is feature-specific.
+
+### What does NOT hold
+
+1. **`re_emerged` is not evidence.** 90.7% here, 99.6-100% in the earlier
+   run -- but **98.5% of injected sites already had the feature active
+   before injection** (median pre-injection code 7.26), and control
+   directions "re-emerge" at 88% for the same reason. It measures site
+   selection, not causal re-firing.
+2. **`code_delta` linearity is a mathematical identity.** Injecting
+   `alpha*w_dec[f]` and then encoding raises code `f` by
+   `~alpha*(w_enc[f].w_dec[f])`, linear in alpha by construction; a random
+   direction in 960-d has near-zero overlap with `w_enc[f]`, so controls at
+   ~0.00 are forced. Not an empirical result.
+3. **There is no demonstrated density effect.** The dense-vs-sparse
+   contrast is **p=0.077**. Pooling the six sparse features gives 420 pairs
+   but only **54 discordant** ones (b=27, c=27, p=1.00), and McNemar power
+   scales with discordant pairs, not total pairs: power to detect a
+   `233`-sized (+2.8pp) effect at 54 discordants is **0.33**. So the sparse
+   features are **underpowered, not demonstrably null**, and "steerability
+   tracks density" is a hypothesis this data cannot test. Claiming it from
+   one significant class plus one non-significant class is the
+   significant/non-significant comparison error.
+4. **`4657` moves the wrong way semantically.** See the anchor-residue
+   section above: it fires on serine 15/15 and injection proposes S->E.
+   Even granting the 8x effect, the residue it installs is anti-correlated
+   with what the feature detects.
+
+### Robustness and caveats
+
+- **Layer-offset warning, now bounded.** 108 rows in the sweep and 42 in
+  the high-alpha arm had `pre_code_pool`/`pre_code_live` disagree beyond
+  tolerance -- 36 distinct sites x 3 direction modes. Dropping all of them
+  plus their paired partners moves `233` from n=2184 to 2181 with
+  discordants unchanged (b=86, c=25) and p=5.03e-09. The flagged rows do
+  not drive any result, but the underlying per-site indexing issue is still
+  unexplained.
+- **Absolute rates differ from the published sweep** (3.7/5.4/8.8% vs
+  2.1/4.0/7.1%) because of design sampling, not method: features with large
+  candidate pools share zero designs with the original run (when 46,000
+  candidates compete for 20 slots, the RNG stream decides, and drawing
+  control directions consumes draws the original did not). Restricted to
+  the 99 designs both runs share, 2x matches at 15.79% vs 15.76%. **Do not
+  mix these absolute rates with the published ones**; the paired
+  comparisons are unaffected.
+- **Exhausted pools.** `2214`, `12588`, `6869`, `10586` and `12918` drew
+  every candidate available. Raising `--designs-per-feature` cannot add
+  power for them -- a density claim needs a different screen.
+
+### Run configuration (Waluigi)
+
+Ran on Waluigi, where the repo layout is `sae/training/`, not `sae/06_steer/`.
+Outputs `injection_with_controls_65kpool.csv` (24,831 rows) and
+`injection_controls_highalpha.csv` (1,830 rows) live on that host, not in
+this repo.
+
+| Input | Path |
+|---|---|
+| Checkpoint | `sae/training/checkpoints_65k_1_4/run4_natural_mix/best.pt` |
+| Pool | `/home/bridget/notebooks/vilip1_layer23_65k_per_residue` (**must be the 65k pool** -- `layer23_per_residue` holds only 116 of the original sweep's 217 designs and silently skips the rest) |
+| Interface YAML | `sae/training/interface_features_combined.yaml` |
+| Feature stats | `sae/training/run4_feature_stats.csv` |
+| Interpreter | `~/esmfold2_venv/bin/python` (torch 2.7.1+cu118; **not** `esm_verify_venv`, whose torch 2.13.0+cu130 needs an r580+ driver and silently falls back to CPU on this host's 525.125.06) |
+
+Hook alignment verified before both runs: `hook(blocks[22])` vs
+`hidden_states[23]` matched at max abs diff 0.
+
+**What is quotable for the abstract:** feature injection causally steers
+ESM-C's residue preference for `233` (+2.8pp over norm-matched random,
+p=5.0e-09, n=2184), and ~2/3 of an uncontrolled dose-response is
+perturbation magnitude. Nothing else above clears correction.
