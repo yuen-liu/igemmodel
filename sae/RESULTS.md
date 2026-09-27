@@ -744,13 +744,39 @@ control showing only the 8x half is feature-specific.
   not drive any result, but the underlying per-site indexing issue is still
   unexplained.
 - **Absolute rates differ from the published sweep** (3.7/5.4/8.8% vs
-  2.1/4.0/7.1%) because of design sampling, not method: features with large
-  candidate pools share zero designs with the original run (when 46,000
-  candidates compete for 20 slots, the RNG stream decides, and drawing
-  control directions consumes draws the original did not). Restricted to
-  the 99 designs both runs share, 2x matches at 15.79% vs 15.76%. **Do not
-  mix these absolute rates with the published ones**; the paired
-  comparisons are unaffected.
+  2.1/4.0/7.1%) **because the original sweep used `--sampling random` and
+  these runs used the default `--sampling top`.** Not the pool, not the
+  interface YAML (md5 `8653fe198ddc4ed090f3c8ee66259d89`, mtime 2026-09-26
+  16:55, predates `injection_scaled.csv` at 18:19 and contains 19 of the
+  original's 20 `233` designs), and not the RNG stream -- under
+  `--sampling top` `select_design_feature_pairs` sorts by `max_activation`
+  and never draws from its generator, and control directions use a separate
+  generator seeded `--seed + 1`, so they cannot affect design selection.
+
+  The `design_max_activation` of the selected designs settles it: `top`
+  picks a tight high band, `random` spans the whole range.
+
+  | Feature | candidates | orig min/mean | new min/mean | designs shared |
+  |---|---|---|---|---|
+  | `233` | 46,327 | 2.37 / 7.13 | 13.00 / 13.39 | 0/20 |
+  | `11326` | 64,997 | 1.89 / 3.99 | 17.29 / 19.35 | 0/20 |
+  | `14247` | 46,995 | 8.99 / 12.33 | 15.60 / 15.92 | 0/20 |
+  | `1707` | 50,765 | 0.53 / 1.20 | 6.48 / 7.28 | 0/20 |
+  | `2214` | 19 | 0.17 / 0.68 | 0.17 / 0.68 | 19/19, identical values |
+  | `12588` | 18 | 0.20 / 0.92 | 0.20 / 0.92 | 18/18, identical values |
+
+  Features with <= 19 candidates match to the decimal because both modes
+  take everything; every large-pool feature shares nothing. And it explains
+  the rate gap with no extra assumption: `top` selects the
+  strongest-activating designs, which respond more strongly to injection.
+  Restricted to the 99 designs both runs share, 2x agrees at 15.79% vs
+  15.76% -- **the method reproduces, the sample does not.**
+
+  **Any rerun meant to compare absolute rates against the published sweep
+  must pass `--sampling random` explicitly.** Otherwise do not mix these
+  absolute rates with the published ones. The paired comparisons are
+  unaffected either way, since every control is drawn at the same design and
+  site as its feature row.
 - **Exhausted pools.** `2214`, `12588`, `6869`, `10586` and `12918` drew
   every candidate available. Raising `--designs-per-feature` cannot add
   power for them -- a density claim needs a different screen.
