@@ -870,3 +870,59 @@ anchor sets `233`->{E,K}, `4657`->{S}, `6073`->{C,L} (C excluded),
 `10586`->{F,G,I,L}. **Before handing this off, drop the 4 proposals that
 mutate an initiator methionine at resnum 1**; terminal positions are 4% of
 the list and ESM-C's predictions there are least reliable.
+
+### Structural arm: handoff to Andrew (2026-09-27)
+
+**Retargeted onto `233`.** The old structural candidate list
+(`steering_candidates_final.csv`, features `4657`/`6073`/`10586`) was chosen
+before controls existed, on energy association and `re_emerged` -- and
+`re_emerged` is near-tautological while those three features show no
+controlled steering effect at any dose. Testing structural accommodation of a
+mutation from a feature that does not demonstrably steer answers nothing.
+`233` is the only feature with both a controlled causal effect (+5.9pp,
+p=1.6e-31) and an energy association (r=-0.36, p=5.6e-15).
+
+**One site per design, deliberately.** `233`'s 294 eligible anchor-installing
+proposals sit on only 20 designs (7-21 sites each, because density 0.42 means
+it fires at many positions per design). Sites sharing a backbone are not
+independent observations, so a sign test across all 264 would treat correlated
+measurements as independent and overstate significance.
+`06_steer/build_structural_handoff.py` takes one site per design: **20
+independent paired observations**, fold budget 100 structures (20 native + 20
+mutant + 60 random-substitution controls) rather than ~1,400.
+
+Outputs `sae/results/run4/structural_sites_233.csv` and
+`structural_folds_233.fasta`. All 20 are `installs_anchor_rank1` (the
+readout's top pick was already an anchor residue), 14 install K and 6 install
+E, resnum 8-63 (median 32.5). **All 20 native backbones are already on disk**
+in `data/vilip1_full20k/results/`, so only the 80 mutant/control folds are
+strictly new work.
+
+**Selection-bias bug worth remembering.** The first version tiebroke on
+`(rank, alpha, resnum)`. Rank and alpha tie almost everywhere -- all 20 sites
+came out rank-1 at 0.5x -- so the resnum term silently selected the most
+N-terminal eligible site in every design: 17 of 20 at resnum <= 22, exactly
+the positions the same script drops below resnum 3 for being unreliable. Now
+a seeded random choice among tied candidates. **When a tiebreak key is
+reached this often it is not a tiebreak, it is the selection criterion.**
+
+**Scoring protocol (`06_steer/score_accommodation.py`).** Use ProteinMPNN's
+`--unconditional_probs_only` and score the position directly. **Do not
+resample** -- that is what produced the earlier all-zero re-check: a single
+point mutation gives a backbone nearly identical to native, so MPNN reads a
+near-native fold and writes back near-native sequence, deleting the mutation
+before ESM-C sees it. Dense features appeared to "survive" only because they
+fire on near-native sequence anyway.
+
+    d_mutant      = logP(proposed) - logP(native)   on the mutant backbone
+    d_native      = logP(proposed) - logP(native)   on the native backbone
+    accommodation = d_mutant - d_native
+
+Positive means the mutant fold prefers the steered residue more than the
+native fold does. Never conditioning on the mutant sequence keeps the
+mutation out of its own score; the paired form cancels each site's intrinsic
+preferences, which is what makes n=20 workable. The 60 controls are not
+optional -- MPNN recovers native residues ~40-50% of the time, so there is no
+interpretable absolute baseline without them.
+
+**Status: folds not yet run as of this writing.**
