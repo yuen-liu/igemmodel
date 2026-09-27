@@ -508,7 +508,7 @@ reliable, estimated from the ~440 designs that have them.)
 superseding the raw-average-based priority above): **`6073`** (solid
 presence effect + real steering signal) is the clearest single candidate.
 `10586` and `4657` are borderline-significant presence effects, both
-still steering-consistent (`4657` pending its higher-alpha retest, see
+steering-consistent (`4657` confirmed via a higher-alpha retest, see
 below) -- reasonable secondary candidates. `233` and `11326`'s activation
 effects are the most statistically robust finding overall, but both are
 near-universal (fire in ~93-100% of designs), so they're not useful as
@@ -521,12 +521,17 @@ independent effect in the regression). `6869`/`2214` remain deprioritized,
 now on more precise grounds ("no detected effect" rather than "detected
 harm").
 
+**`4657` higher-alpha retest (2026-09-27): confirmed real, was under-dosed,
+not sequence-inert.** The original run only tested alpha up to 2x mean
+activation and got 0% `aa_argmax_changed`. Retested at 4x/8x
+(`injection_4657_highalpha.csv`, 50 designs, 232 rows): clear dose-response
+-- 5.2% `aa_argmax_changed` at 4x, 11.2% at 8x (19 qualifying rows total,
+re-emergence 100% throughout). `4657` is confirmed in, not pending.
+
 **Next step**: `inject_feature.py` outputs a `mutated_sequence` column
 (native sequence with the flagged position swapped to `argmax_aa_post`)
 for exactly this handoff. Filter `re_emerged & aa_argmax_changed`
 **restricted to `6073`/`10586`/`4657`** (not `12588`, per the correction
-above; not the full 178-site list), and hand those to Andrew for Boltz
-re-folding + ProteinMPNN inverse-folding (steps 3-4 of the steering
-pipeline). Not yet sent as of this writing. `4657`'s inclusion depends on
-its higher-alpha retest (in progress) actually showing a steering effect --
-drop it if that comes back null too.
+above; not the full 178-site list; `4657` confirmed above), and hand those
+to Andrew for Boltz re-folding + ProteinMPNN inverse-folding (steps 3-4 of
+the steering pipeline). Not yet sent as of this writing.
