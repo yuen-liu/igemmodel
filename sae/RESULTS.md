@@ -803,3 +803,69 @@ Hook alignment verified before both runs: `hook(blocks[22])` vs
 ESM-C's residue preference for `233` (+2.8pp over norm-matched random,
 p=5.0e-09, n=2184), and ~2/3 of an uncontrolled dose-response is
 perturbation magnitude. Nothing else above clears correction.
+
+### 233 across five doses, with controls (2026-09-27)
+
+`injection_topk_controls.csv` (13,035 rows = 4,345 sites x 3 direction modes,
+`--features 233,4657,6073,10586 --alpha-multipliers 0.5,1.0,2.0,4.0,8.0
+--sampling top`, zero skips). Extends the controlled measurement to 4x/8x,
+which the earlier arm never covered, and **replicates it**: averaged over the
+three shared doses the excess is +2.9pp here against +2.8pp before, on the
+same 728 sites per dose.
+
+| alpha | n pairs | feature | random | excess | b/c | p (exact McNemar) |
+|---|---|---|---|---|---|---|
+| 0.5x | 728 | 2.9% | 1.1% | +1.8pp | 17/4 | 0.0072 |
+| 1.0x | 728 | 4.1% | 1.6% | +2.5pp | 24/6 | 0.0014 |
+| 2.0x | 728 | 8.1% | 3.6% | +4.5pp | 46/13 | <0.0001 |
+| 4.0x | 728 | 10.9% | 5.1% | +5.8pp | 64/22 | <0.0001 |
+| 8.0x | 728 | 22.5% | 7.6% | +15.0pp | 136/27 | <0.0001 |
+| **all** | **3640** | **9.7%** | **3.8%** | **+5.9pp** | **287/72** | **1.6e-31** |
+
+**Significant at every dose individually**, including the lowest. This is the
+strongest steering result in the project and the one to quote.
+
+**But the specificity ratio does not grow with dose -- state this carefully.**
+The share of discordant pairs favouring the feature is flat (0.81 / 0.80 /
+0.78 / 0.74 / 0.83; Cochran-Armitage z=0.671, **p=0.50**). What rises with
+alpha is the *number* of sites that change at all (21 -> 163 discordant
+pairs), not the feature's share of them. So the claim is an invariance --
+**the feature direction beats a norm-matched random direction ~4:1 among
+discordant pairs, constant across a 16-fold dose range** -- not "steering
+becomes more feature-specific at higher dose." The percentage-point excess
+grows only because the base rate does.
+
+**The other three features remain null at every dose**, now including 4x/8x:
+`4657` +1.4pp pooled (p=0.21, n=435), `6073` -0.7pp (p=1.00, n=140), `10586`
+-2.3pp (p=0.61, n=130). `4657`'s earlier nominal 8x effect does not reappear
+here (+2.3pp, p=0.75) -- consistent with it having been one of six tests.
+
+**Caveat on generality.** These runs use `--sampling top`, so every site is
+one where the feature already fires strongly (`233`'s selected designs span
+`design_max_activation` 13.00-13.39). The controls are drawn at the identical
+sites so the comparison is clean, but the claim is bounded: injection steers
+residue preference *at sites where the feature fires strongly*. Whether it
+holds at typical sites needs one `--sampling random` arm, untested as of now.
+
+### Anchor-aware candidate list (2026-09-27)
+
+`06_steer/select_topk_mutations.py` over `injection_topk.csv` (4,345 rows):
+
+| outcome | n | share |
+|---|---|---|
+| `native_is_anchor` (excluded) | 2135 | 49% |
+| `no_anchor_in_topk` (excluded) | 696 | 16% |
+| installs anchor at rank 1 | 548 | 13% |
+| installs anchor at ranks 2-5 | 966 | 22% |
+
+**49% of sites have the anchor residue already present**, which is the scale
+of the problem the argmax readout was hiding -- at those sites every
+substitution destroys what the feature detects. The 966 rank-2-to-5 hits are
+proposals an argmax readout cannot reach at all.
+
+Output `sae/results/run4/steering_candidates_topk.csv`: 370 distinct
+proposals over 57 designs (`233` 306, `4657` 34, `6073` 16, `10586` 14),
+anchor sets `233`->{E,K}, `4657`->{S}, `6073`->{C,L} (C excluded),
+`10586`->{F,G,I,L}. **Before handing this off, drop the 4 proposals that
+mutate an initiator methionine at resnum 1**; terminal positions are 4% of
+the list and ESM-C's predictions there are least reliable.
