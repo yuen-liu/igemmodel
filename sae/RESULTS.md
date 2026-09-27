@@ -817,9 +817,9 @@ same 728 sites per dose.
 |---|---|---|---|---|---|---|
 | 0.5x | 728 | 2.9% | 1.1% | +1.8pp | 17/4 | 0.0072 |
 | 1.0x | 728 | 4.1% | 1.6% | +2.5pp | 24/6 | 0.0014 |
-| 2.0x | 728 | 8.1% | 3.6% | +4.5pp | 46/13 | <0.0001 |
-| 4.0x | 728 | 10.9% | 5.1% | +5.8pp | 64/22 | <0.0001 |
-| 8.0x | 728 | 22.5% | 7.6% | +15.0pp | 136/27 | <0.0001 |
+| 2.0x | 728 | 8.1% | 3.6% | +4.5pp | 46/13 | 1.9e-05 |
+| 4.0x | 728 | 10.9% | 5.1% | +5.8pp | 64/22 | 6.5e-06 |
+| 8.0x | 728 | 22.5% | 7.6% | +15.0pp | 136/27 | 1.1e-18 |
 | **all** | **3640** | **9.7%** | **3.8%** | **+5.9pp** | **287/72** | **1.6e-31** |
 
 **Significant at every dose individually**, including the lowest. This is the
@@ -827,7 +827,8 @@ strongest steering result in the project and the one to quote.
 
 **But the specificity ratio does not grow with dose -- state this carefully.**
 The share of discordant pairs favouring the feature is flat (0.81 / 0.80 /
-0.78 / 0.74 / 0.83; Cochran-Armitage z=0.671, **p=0.50**). What rises with
+0.78 / 0.74 / 0.83; Cochran-Armitage z=0.671, **p=0.50**; the narrower 8x
+vs 0.5x ratio test independently gives p=0.759). What rises with
 alpha is the *number* of sites that change at all (21 -> 163 discordant
 pairs), not the feature's share of them. So the claim is an invariance --
 **the feature direction beats a norm-matched random direction ~4:1 among
