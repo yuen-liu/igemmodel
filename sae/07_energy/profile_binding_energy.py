@@ -10,6 +10,9 @@ Verified in this repo's development (2026-09-26, sae/07_energy/verify_prime_env.
     energy" (single minimization of the complex, then single-point energy
     of each isolated chain from that SAME geometry), not full binding
     free energy. See module docstring in verify_prime_env.py for why.
+    Here the minimization is restricted to the interface (binder + target
+    residues within --iface-cutoff A), not the whole complex -- see
+    compute_interaction_energy.
   - schrodinger.structutils.analyze.hbond.get_hydrogen_bonds exists and
     (per its docstring) returns a list of (donor_atom, acceptor_atom)
     tuples.
@@ -44,15 +47,23 @@ import yaml
 YAML_LOADER = yaml.CSafeLoader if yaml.__with_libyaml__ else yaml.SafeLoader
 
 
-def compute_interaction_energy(st, target_chain: str, binder_chain: str):
+def compute_interaction_energy(st, target_chain: str, binder_chain: str, iface_cutoff: float):
     from schrodinger.structutils.analyze import evaluate_asl
     from schrodinger.application.prime.packages import Prime
     import numpy as np
 
-    all_atoms = np.array(evaluate_asl(st, "all"), dtype=np.int32)
+    # Minimize only the interface: the whole binder plus every target residue
+    # with an atom within iface_cutoff A of it; the rest of the target stays
+    # frozen. Minimizing all atoms of the complex was benchmarked (2026-09-27)
+    # at >8 GB RSS and still growing after 4+ min; an 8 A interface on the
+    # same design took ~2.5 min at ~1 GB.
+    iface_atoms = np.array(evaluate_asl(
+        st, f"chain.name {binder_chain} or "
+            f"(fillres (chain.name {target_chain} and within {iface_cutoff} chain.name {binder_chain}))"),
+        dtype=np.int32)
     with Prime.PrimeServer(st) as pes:
         pes.updateEnergyParams(include_pipack=False)
-        pes.minimizeSelectedAtoms(all_atoms)
+        pes.minimizeSelectedAtoms(iface_atoms)
         e_complex = pes.calculateEnergy(st.getXYZ(), update_nb_list=1, update_sgb_opt=1)
 
     target_indices = evaluate_asl(st, f"chain.name {target_chain}")
@@ -70,7 +81,7 @@ def compute_interaction_energy(st, target_chain: str, binder_chain: str):
         pes.updateEnergyParams(include_pipack=False)
         e_binder = pes.calculateEnergy(binder_only.getXYZ(), update_nb_list=1, update_sgb_opt=1)
 
-    return e_complex, e_target, e_binder
+    return e_complex, e_target, e_binder, len(iface_atoms)
 
 
 def compute_interface_hbonds(st, target_chain: str, binder_chain: str) -> int:
@@ -95,6 +106,8 @@ def main() -> None:
     parser.add_argument("--target-chain", default="A")
     parser.add_argument("--binder-chain", default="C")
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--iface-cutoff", type=float, default=5.0,
+                        help="Target residues within this many A of the binder are minimized with it (default 5.0)")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -114,7 +127,8 @@ def main() -> None:
     from schrodinger.structure import StructureReader
 
     st = StructureReader.read(str(args.prepped_mae))
-    e_complex, e_target, e_binder = compute_interaction_energy(st, args.target_chain, args.binder_chain)
+    e_complex, e_target, e_binder, n_minimized = compute_interaction_energy(
+        st, args.target_chain, args.binder_chain, args.iface_cutoff)
     d_e_interaction = e_complex - e_target - e_binder
     n_interface_hbonds = compute_interface_hbonds(st, args.target_chain, args.binder_chain)
 
@@ -130,6 +144,8 @@ def main() -> None:
             "E_binder": e_binder,
             "dE_interaction": d_e_interaction,
             "n_interface_hbonds": n_interface_hbonds,
+            "iface_cutoff": args.iface_cutoff,
+            "n_atoms_minimized": n_minimized,
         })
 
     import csv

@@ -393,29 +393,82 @@ Overall: 318 qualifying rows, 75 unique designs, 178 unique
    affect `code_delta`/`re_emerged` (computed entirely from same-methodology
    live forward passes, never from the pool baseline).
 
-**Gap: this candidate list is not yet filtered by binding quality.**
-Everything above ranks features by (a) geometric proximity to the interface
-(Vignesh's contact/shell tiers -- distance to the target chain, not a
-binding-quality metric) and (b) our own causal steering effect (SAE
-re-emergence + MLM logit shift). Neither of those says whether a design is
-actually a *good* binder. The original steering plan's "profile against
-predicted hydrogen bonds and free energy (Amber relaxation / Rosetta
-energy)... features with high delta binding energy = candidates to
-extract" step -- Vignesh's other step-1 deliverable -- has not been
-cross-referenced against this data at all; no H-bond/Amber/Rosetta
-energy-delta numbers exist yet anywhere in this pipeline's output (not in
-`extract_interface_features.py`'s YAML, not in `injection_scaled.csv`).
-The specificity/dose-response ranking above is a reasonable first filter,
-but "fires near the interface and steers causally" is not the same claim
-as "affects binding energy" -- treat the current ranking as provisional
-until that energy data exists and gets merged in.
+## Energy profiling: Schrodinger Prime interaction energy (2026-09-27)
 
-**Next step**: `inject_feature.py` now also outputs a `mutated_sequence`
-column (native sequence with the flagged position swapped to
-`argmax_aa_post`) for exactly this handoff -- filter
-`re_emerged & aa_argmax_changed`, dedupe to unique `(design_id, position)`
-(178 sites), and hand those to Andrew for Boltz re-folding + ProteinMPNN
-inverse-folding (steps 3-4 of the steering pipeline). Not yet sent as of
-this writing. Ideally cross-reference against Vignesh's energy-profiling
-numbers first, once they exist, to prioritize within the 178 sites rather
-than sending all of them.
+Closes the gap above. For the same 477 designs sampled for steering
+(`sae/07_energy/select_energy_sample.py`, up to 50/feature), computed an
+approximate MM **interaction energy** (not full binding free energy --
+single Prime minimization of the interface region, default 5A cutoff
+around the binder, then single-point energy of the isolated target/binder
+extracted from that same geometry; `dE_interaction = E_complex - E_target
+- E_binder`) plus interface H-bond counts
+(`schrodinger.structutils.analyze.hbond`), via `sae/07_energy/profile_binding_energy.py`
++ `run_energy_profiling.bash` (SLURM array, Gates). All 477/477 designs
+succeeded, ~45s-3min/design. Real numbers: `dE_interaction` ranges -475 to
+-28 kcal/mol (median -184, all favorable, none repulsive), correlates with
+H-bond count (r=-0.68, more H-bonds = more favorable, as expected).
+Combined output: `sae/results/run4/energy_profile_combined.csv` (2,111
+rows), one row per (design, feature) pair.
+
+**Follow-up finding**: activation *strength* (not just presence) tracks
+binding quality for the near-universal features -- `233`'s activation
+correlates with `dE_interaction` at r=-0.36 (p=5.6e-15, n=444; more
+negative dE = more favorable, so stronger firing = better binding) and
+with H-bond count at r=0.15 (p=0.0013). `14247`/`11326` show the same
+direction, weaker. This reframes `233` from "boring baseline, fires
+everywhere" to "fires everywhere, but firing strength is a real,
+statistically robust binding-quality signal." The rare features
+(`12588`/`6073`/`10586`/`6869`/`2214`/`12918`) show no significant
+activation-vs-energy correlation, but likely underpowered (n=18-57 vs.
+`233`'s 444) rather than genuinely null -- worth a larger sample before
+concluding they lack a dose-dependent signal.
+
+**Cross-referenced against the steering results** (`injection_scaled.csv`), per feature:
+
+| Feature | n designs (energy) | Mean dE_interaction | Mean H-bonds | aa_argmax_changed rate (steering) | Qualifying rows |
+|---|---|---|---|---|---|
+| 12588 | 18 | **-226.9** | 14.4 | 6.7% | 4 |
+| 4657 | 57 | -214.5 | 14.8 | **0.0%** | 0 |
+| 6073 | 56 | -212.2 | 12.2 | 4.0% | 3 |
+| 10586 | 41 | -207.1 | 13.7 | 3.8% | 3 |
+| 11326 (baseline, near-universal) | 477 | -184.6 | 12.2 | 3.1% | 35 |
+| 14247 (baseline, near-universal) | 449 | -184.5 | 12.2 | 6.2% | 173 |
+| 1707 (baseline, near-universal) | 448 | -184.3 | 12.2 | 1.1% | 7 |
+| 233 (baseline, near-universal) | 444 | -183.7 | 12.1 | 2.9% | 65 |
+| 12918 | 52 | -173.5 | 11.6 | 6.9% | 5 |
+| 6869 | 50 | -164.1 | 12.1 | **27.3%** | 16 |
+| 2214 | 19 | **-152.5** | 11.2 | 11.7% | 7 |
+
+**Key finding: energy and steering-effect strength are inversely related
+for the two most exciting steering hits.** `6869` and `2214` -- the
+rarest, most causally-responsive features under steering (27.3% and 11.7%
+`aa_argmax_changed` rates, the two highest of any candidate) -- have the
+**two least favorable interaction energies of the entire list**, both
+worse than the near-universal baseline features (~-184). This directly
+validates the caution already raised above (finding #5): `6869`'s
+InterPro label (P-loop NTPase/GTPase) and `2214`'s (Glycoside Hydrolase)
+have no known relationship to VSNL1's real biology, and now there's
+concrete energetic evidence they aren't "helps binding" features either --
+a strong, reproducible causal steering effect is not the same claim as
+"contributes to favorable binding energy," exactly the distinction this
+gap note existed to make. Conversely, `12588`, `6073`, and `10586` show
+the best combination of both signals: favorable energy *and* a real (if
+more modest) steering effect. `4657` has the second-best energy of any
+feature but **zero** causal steering effect (consistent with finding #4
+above) -- a real energetic association without (yet-demonstrated)
+sequence-level causality; worth a higher-alpha steering re-test before
+concluding it's uninteresting, not immediate hand-off material.
+
+**Revised candidate priority for hand-off, energy + steering combined**:
+`12588` > `6073` ≈ `10586` as the strongest balanced candidates;
+`4657` as an energy-only candidate pending a steering re-test; `6869` and
+`2214` demoted despite their steering excitement, given the energy
+evidence now argues against them being real binding-relevant features.
+
+**Next step**: `inject_feature.py` outputs a `mutated_sequence` column
+(native sequence with the flagged position swapped to `argmax_aa_post`)
+for exactly this handoff. Filter `re_emerged & aa_argmax_changed`
+**restricted to `12588`/`6073`/`10586`** (not the full 178-site list --
+see the revised priority above), and hand those to Andrew for Boltz
+re-folding + ProteinMPNN inverse-folding (steps 3-4 of the steering
+pipeline). Not yet sent as of this writing.

@@ -1,14 +1,12 @@
 #!/bin/bash
 # SLURM array job: one task per design. Each task preps its own structure
-# (prepwizard, via jobcontrol) then computes interaction energy + interface
-# H-bonds (profile_binding_energy.py).
+# (prepwizard -NOJOBID, no job server -- see the comment above the prepwizard
+# call) then computes interaction energy + interface H-bonds
+# (profile_binding_energy.py).
 #
 # Deliberately uses the DEFAULT `module load schrodinger` install, never
 # `module unload`/a custom $SCHRODINGER path -- see sae/README.md and this
-# session's plan notes on the Gates env-isolation incident. Each array task
-# runs on its own compute node, so each starts its OWN local jobcontrol
-# server (a login-node server, like the one used interactively, is not
-# reachable from a compute node).
+# session's plan notes on the Gates env-isolation incident.
 #
 # IMPORTANT -- run a small test first: sbatch --array=0-2 this script,
 # confirm all 3 tasks produce a sane .csv in $OUTPUT_DIR before submitting
@@ -31,7 +29,10 @@ set -euo pipefail
 
 DESIGN_IDS_FILE="energy_sample_design_ids.txt"
 STRUCTURES_DIR="energy_sample"
-INTERFACE_YAML="sae/results/run4/yamls/interface_features_combined.yaml"
+# 477-design subset of interface_features_combined.yaml, made once by
+# energy_bench/make_sample_yaml.py -- the full 210 MB file takes minutes and
+# ~4+ GB to parse in each task (Schrodinger python has no libyaml).
+INTERFACE_YAML="sae/results/run4/yamls/interface_features_energy_sample.yaml"
 PREPPED_DIR="prepped"
 OUTPUT_DIR="energy_results"
 TARGET_CHAIN="A"
@@ -60,53 +61,39 @@ fi
 echo "[$DESIGN_ID] loading schrodinger module..."
 module load schrodinger/2025-1
 
-echo "[$DESIGN_ID] starting this task's own local job server..."
-"$SCHRODINGER/jsc" local-server-start
+# Run prepwizard WITHOUT job control (-NOJOBID): it runs in the foreground
+# inside this task, so no job server is involved at all. A per-node job
+# server broke at scale (first full run, 2026-09-27): all tasks on a node
+# share one jobserverd started inside whichever task got there first, so
+# every prepwizard on that node ran in (and counted against the memory of)
+# that one task's cgroup -- OOM kills, and SLURM killing the server when that
+# task ended. The server location is also recorded in a single shared file
+# in $HOME, so nodes overwrote each other's entry. -NOJOBID also dropped
+# prepwizard from ~2.5 min to ~45 s per design.
+#
+# Work in a per-task scratch dir: prepwizard drops a <name>-001/ subjob dir
+# and a log next to its output.
+WORKDIR="${TMPDIR:-/tmp}/energy_${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}"
+mkdir -p "$WORKDIR"
+trap 'rm -rf "$WORKDIR"' EXIT
+CIF_ABS="$(readlink -f "$CIF")"
 
-# Give the job server a moment to actually be ready to accept submissions --
-# "Job server available" printing doesn't necessarily mean it can take a job
-# yet. Poll `jsc list` (works once the server is truly up) instead of a
-# blind sleep, with a sleep as a floor.
-sleep 2
-for i in 1 2 3 4 5 6 7 8 9 10; do
-    if "$SCHRODINGER/jsc" list >/dev/null 2>&1; then
-        break
-    fi
-    echo "[$DESIGN_ID] job server not ready yet, waiting..."
-    sleep 3
-done
-
-echo "[$DESIGN_ID] running prepwizard..."
+echo "[$DESIGN_ID] running prepwizard (-NOJOBID) in $WORKDIR..."
 set +e
-PREPWIZARD_OUTPUT=$("$SCHRODINGER/utilities/prepwizard" "$CIF" "$MAE" 2>&1)
+( cd "$WORKDIR" && "$SCHRODINGER/utilities/prepwizard" -NOJOBID "$CIF_ABS" "${DESIGN_ID}.mae" > "${DESIGN_ID}.log" 2>&1 )
 PREPWIZARD_EXIT=$?
 set -e
-echo "$PREPWIZARD_OUTPUT"
+[ -f "$WORKDIR/${DESIGN_ID}.log" ] && cp "$WORKDIR/${DESIGN_ID}.log" "$LOG"
+[ -f "$WORKDIR/${DESIGN_ID}.mae" ] && mv "$WORKDIR/${DESIGN_ID}.mae" "$MAE"
 if [ "$PREPWIZARD_EXIT" -ne 0 ]; then
-    echo "ERROR: prepwizard exited with code $PREPWIZARD_EXIT -- output above" >&2
-    exit 1
+    echo "ERROR: prepwizard exited with code $PREPWIZARD_EXIT" >&2
 fi
-JOBID=$(echo "$PREPWIZARD_OUTPUT" | grep -oE 'JobId: [0-9a-f-]+' | awk '{print $2}')
-if [ -z "$JOBID" ]; then
-    echo "ERROR: prepwizard did not return a JobId for $CIF -- output above" >&2
-    exit 1
-fi
-
-echo "[$DESIGN_ID] waiting for prepwizard job $JOBID..."
-ELAPSED=0
-TIMEOUT=1200
-while "$SCHRODINGER/jsc" list 2>/dev/null | grep -q "^$JOBID"; do
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-    if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
-        echo "ERROR: prepwizard job $JOBID still running after ${TIMEOUT}s -- giving up" >&2
-        exit 1
-    fi
-done
 
 if [ ! -f "$MAE" ]; then
-    echo "ERROR: prepwizard job $JOBID finished but $MAE was not created -- check for a "\
-"${DESIGN_ID}*.log file in the working directory" >&2
+    echo "ERROR: prepwizard finished but $MAE was not created" >&2
+    for f in "$LOG"; do
+        [ -f "$f" ] && { echo "--- tail of $f ---" >&2; tail -40 "$f" >&2; }
+    done
     exit 1
 fi
 
