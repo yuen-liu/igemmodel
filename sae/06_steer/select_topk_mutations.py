@@ -53,17 +53,21 @@ def derive_anchors(top_examples_csv: Path, coverage: float) -> dict[str, set[str
     return anchors
 
 
-def select(row: dict, anchors: set[str]) -> tuple[str | None, str]:
+def select(row: dict, anchors: set[str], exclude: frozenset[str] = frozenset()) -> tuple[str | None, str]:
     """Returns (proposed_aa, reason). proposed_aa is None when excluded."""
     native = row["native_aa"]
     if not anchors:
         return None, "no_anchor_derived"
     if native in anchors:
         return None, "native_is_anchor"
+    blocked = False
     for candidate in row["top_k_aa_post"]:
         if candidate in anchors:
+            if candidate in exclude:
+                blocked = True
+                continue
             return candidate, f"installs_anchor_rank{row['top_k_aa_post'].index(candidate) + 1}"
-    return None, "no_anchor_in_topk"
+    return None, "anchor_excluded_by_chemistry" if blocked else "no_anchor_in_topk"
 
 
 def main() -> None:
@@ -72,11 +76,19 @@ def main() -> None:
                         help="inject_feature.py output including a top_k_aa_post column")
     parser.add_argument("--top-examples", type=Path, required=True)
     parser.add_argument("--anchor-coverage", type=float, default=0.6)
+    parser.add_argument("--exclude-residues", type=str, default="",
+                        help="Residues never to propose even when they are anchors, e.g. 'C' to avoid "
+                             "installing cysteines (spurious disulfides / oxidation in a designed binder). "
+                             "6073's anchor set is {C,L}, so C is reachable by default. Off unless set -- "
+                             "this is a chemistry judgement, not something the ranking knows.")
     parser.add_argument("--features", type=str, default=None, help="Comma-separated allowlist")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
+    exclude = frozenset(args.exclude_residues.strip().upper())
     anchors = derive_anchors(args.top_examples, args.anchor_coverage)
+    if exclude:
+        print(f"Excluding residues from proposals: {''.join(sorted(exclude))}")
     print("Derived anchor sets:")
     for feature in sorted(anchors, key=lambda f: (len(anchors[f]), f)):
         print(f"  {feature:>6}: {''.join(sorted(anchors[feature]))}")
@@ -95,7 +107,7 @@ def main() -> None:
 
     kept, reasons = [], Counter()
     for row in rows:
-        proposed, reason = select(row, anchors.get(row["feature_id"], set()))
+        proposed, reason = select(row, anchors.get(row["feature_id"], set()), exclude)
         reasons[reason] += 1
         if proposed is None:
             continue
