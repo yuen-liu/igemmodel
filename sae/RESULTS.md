@@ -530,8 +530,40 @@ re-emergence 100% throughout). `4657` is confirmed in, not pending.
 
 **Next step**: `inject_feature.py` outputs a `mutated_sequence` column
 (native sequence with the flagged position swapped to `argmax_aa_post`)
-for exactly this handoff. Filter `re_emerged & aa_argmax_changed`
-**restricted to `6073`/`10586`/`4657`** (not `12588`, per the correction
-above; not the full 178-site list; `4657` confirmed above), and hand those
-to Andrew for Boltz re-folding + ProteinMPNN inverse-folding (steps 3-4 of
-the steering pipeline). Not yet sent as of this writing.
+for exactly this handoff. Filter `re_emerged & aa_argmax_changed &
+argmax_aa_post != native_aa` **restricted to `6073`/`10586`/`4657`** (not
+`12588`, per the correction above; not the full 178-site list; `4657`
+confirmed above), and hand those to Andrew for Boltz re-folding +
+ProteinMPNN inverse-folding (steps 3-4 of the steering pipeline). Built by
+`06_steer/build_handoff.py`; do not filter ad hoc.
+
+**Handoff filter correction (2026-09-27).** The first list sent to Andrew
+had 18 sites and **6 of them proposed no mutation at all**. `aa_argmax_changed`
+compares the *pre*-steering argmax to the *post*-steering argmax, not the
+post-steering argmax to the native residue. When ESM-C already disagreed
+with nature at a position, steering could move its pick back *onto* the
+native residue: the flag reads True while `mutated_sequence` comes out
+byte-identical to the input (e.g. `4657` resnum 52, native F, pre-argmax L,
+post-argmax F). Those 6 sites were 5 of the 13 `4657` rows and 1 of the 3
+`10586` rows. Andrew folded and inverse-folded the unmodified native protein
+for them, so they appear as failures in his post-ProteinMPNN ESM-C re-check
+but were never tests. Corrected list is 12 sites (`4657` 8, `10586` 2,
+`6073` 2) -- the same 12 valid rows, with the 6 no-ops dropped; nothing was
+wrongly excluded.
+
+**The argmax readout proposes mutations that delete the feature's anchor
+residue.** Checking `argmax_aa_post` against the residue each feature
+actually fires on (bracketed position in `feature_top_examples.csv`):
+`4657` fires on serine in **15/15** top examples, yet steering proposes
+S->E at resnums 28/58/61 and S->T at 17 -- 4 of 8 proposals *remove* the
+serine the feature is defined on, and only 1 of 8 (T7->S) installs one.
+`6073` fires on leucine (7/15) and neither of its 2 proposals installs an
+L. The label for `4657` is "serine preceded by acidic residues": the
+injected direction encodes anchor *plus* acidic context, and the MLM head
+resolves it toward the context (E) rather than the anchor (S). So the
+post-ProteinMPNN ESM-C re-check fails on these by construction, not
+because of a pipeline error -- the mutation removes the residue the
+feature requires. A single-position argmax readout cannot express "keep
+the serine, acidify the neighbours," which is what these features
+actually want. Revisit the readout before drawing conclusions about
+whether steering transfers through structure.
