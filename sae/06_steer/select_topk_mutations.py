@@ -89,9 +89,6 @@ def main() -> None:
     anchors = derive_anchors(args.top_examples, args.anchor_coverage)
     if exclude:
         print(f"Excluding residues from proposals: {''.join(sorted(exclude))}")
-    print("Derived anchor sets:")
-    for feature in sorted(anchors, key=lambda f: (len(anchors[f]), f)):
-        print(f"  {feature:>6}: {''.join(sorted(anchors[feature]))}")
 
     rows = list(csv.DictReader(open(args.injection_csv)))
     if "top_k_aa_post" not in rows[0]:
@@ -104,6 +101,13 @@ def main() -> None:
     rows = [r for r in rows
             if r.get("direction_mode", "feature") == "feature"
             and (allow is None or r["feature_id"] in allow)]
+
+    print("Derived anchor sets (features present in this run):")
+    for feature in sorted({r["feature_id"] for r in rows}, key=lambda f: (len(anchors.get(f, ())), f)):
+        residues = "".join(sorted(anchors.get(feature, ()))) or "(none)"
+        blocked = "".join(sorted(anchors.get(feature, set()) & exclude))
+        note = f"   [excluded: {blocked}]" if blocked else ""
+        print(f"  {feature:>6}: {residues}{note}")
 
     kept, reasons = [], Counter()
     for row in rows:
