@@ -526,6 +526,40 @@ above) -- a real energetic association without (yet-demonstrated)
 sequence-level causality; worth a higher-alpha steering re-test before
 concluding it's uninteresting, not immediate hand-off material.
 
+> **RETRACTED (2026-09-27, after controls) -- the steering column above is
+> uncontrolled and two of its conclusions are wrong.** Every
+> `aa_argmax_changed` rate in that table is an absolute rate with no null
+> condition. With norm-matched controls paired at the same design/site/alpha
+> (see "Controlled feature injection" at the end of this file):
+>
+> | Feature | table's claim | controlled result |
+> |---|---|---|
+> | `6869` | "most causally-responsive", 27.3% | +3.0pp vs random, **p=0.73** -- not distinguishable from a random direction |
+> | `2214` | 11.7%, second-highest | +3.3pp, **p=0.77** |
+> | `4657` | "zero effect, worth a higher-alpha re-test" | re-tested: null at 4x, nominal only at 8x (p=0.0094, Bonferroni 0.056) |
+> | `12588`/`6073`/`10586` | "best combination of both signals" | steering half is null; energy half stands |
+> | `233` | "2.9%, near-universal baseline" | **the only feature that survives correction: +2.8pp, p=5.0e-09, n=2184** |
+>
+> So "the two most exciting steering hits" were not hits, and the priority
+> ordering derived from this table should not be used. **The energy column is
+> unaffected** -- those are Prime minimizations with no dependence on
+> injection, and `233`'s activation-vs-`dE_interaction` correlation
+> (r=-0.36, p=5.6e-15, n=444) stands exactly as reported.
+>
+> **What this table got right:** it flagged that the strongest apparent
+> steering hits had the *least* favorable interaction energies, and warned
+> that a causal steering effect is not the same claim as "contributes to
+> favorable binding." That warning was correct, and the controls explain it
+> -- those steering rates were noise. The energy numbers were signalling the
+> problem before a null condition existed to prove it.
+>
+> **Where this leaves candidate selection:** the energy analysis and the
+> controlled steering analysis, chosen for unrelated reasons, converge on
+> `233` -- the only feature with both a robust correlational link to
+> interaction energy and a demonstrated causal steering effect. Retarget the
+> structural arm onto `233`, not the sparse features. Its ~46,000 candidate
+> sites also avoid the pool-exhaustion that caps `10586` at 41.
+
 **Correction (2026-09-27): the raw per-feature averages above are confounded, and a
 proper multi-feature regression changes the priority.** Designs carry
 several candidate features at once (the per-feature groups overlap), so a
