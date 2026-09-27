@@ -231,6 +231,47 @@ binder-only row. run1's is in the repo:
 | `binder_dataset_vilip1` (69 non-binders) | 35869 | 0.3795 | 0.7026 | 1/4096 |
 | `natural_binders` (13 real binders) | 5362 | **0.4404** | 0.7134 | 50/4096 |
 
+### Full biohub comparison, run1 (`benchmark_results_65k/benchmark_summary.csv`)
+
+The natural rows above are only half of that file. The design split was
+never recorded here, and it is where the comparison actually favours us --
+the tradeoff is directional, not a uniform loss:
+
+| split | source | n_residues | ours FVE | biohub FVE | ours dead | biohub dead |
+|---|---|---|---|---|---|---|
+| held_out_designs | `__pooled__` | 696005 | **0.9656** | 0.6805 | 0/4096 | 921/16384 |
+| held_out_designs | `vilip1_full20k` | 131804 | **0.9067** | 0.8149 | 1/4096 | 3023/16384 |
+| held_out_designs | `composite_hotspot` | 62922 | **0.9729** | 0.6673 | 3/4096 | 3997/16384 |
+| held_out_designs | `composite_hotspot_20260728` | 501279 | **0.9711** | 0.6673 | 0/4096 | 1327/16384 |
+| natural_binders_qualitative | `__pooled__` (82) | 41231 | 0.3851 | **0.7036** | 1/4096 | 662/16384 |
+| natural_binders_qualitative | `binder_dataset_vilip1` (69) | 35869 | 0.3795 | **0.7026** | 1/4096 | 794/16384 |
+| natural_binders_qualitative | `natural_binders` (13) | 5362 | 0.4404 | **0.7134** | 50/4096 | 6522/16384 |
+
+Two things worth quoting from this that are not in the table above:
+
+1. **On the design distribution we beat biohub by a wide margin** (0.9656
+   vs. 0.6805 pooled; +0.29 FVE), and still win on `vilip1_full20k`
+   (0.9067 vs. 0.8149) where biohub does best. The natural-FVE deficit is
+   a generalization gap on out-of-distribution sequence, not a worse
+   autoencoder.
+2. **Biohub's dead-feature count is highly input-dependent** -- 662/16384
+   on pooled naturals but 6522/16384 on the 13 real binders, and
+   3997/16384 on `composite_hotspot`. Ours stays at 0-3/4096 on designs
+   and 50/4096 on the binders. So "dead" is not a fixed property of a
+   dictionary; quote it with the eval source attached or it means nothing.
+
+**Still missing (Waluigi only).** Biohub numbers for run2-run6 are not in
+the repo -- only run1's `benchmark_summary.csv` is here. The header's
+"~0.6972-0.7036 across benchmark runs" range is therefore not reproducible
+from anything committed. Pull the remaining `benchmark_summary.csv` files
+per Step 1 below and extend this table rather than re-deriving the range.
+
+There is a second, earlier `benchmark_summary.csv` in
+`vilip1_layer23_sae_outputs/benchmark_results/` (ours 0.4196 / biohub
+0.7016 on the 13, design pooled 0.9412 / 0.7159). Its eval set is the 13
+binders alone, so it predates the 82-sequence setup and is **not** run1 --
+provenance unconfirmed, do not merge the two.
+
 So step 1 is just to pull the CSVs that already exist, and only re-run
 `benchmark.py` for any run whose CSV was lost.
 
