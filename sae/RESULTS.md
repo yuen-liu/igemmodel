@@ -926,3 +926,61 @@ optional -- MPNN recovers native residues ~40-50% of the time, so there is no
 interpretable absolute baseline without them.
 
 **Status: folds not yet run as of this writing.**
+
+### Structural arm results and the matched-baseline check (2026-09-27)
+
+Andrew ran ProteinMPNN `--unconditional_probs_only` on the 100 folds. Two
+findings, one negative and one pending.
+
+**1. Accommodation of the steered mutation: null.** The double-difference
+(`d_mutant - d_native`) came out +1.318 for steered mutations against +1.786
+for the pooled random-substitution controls -- paired difference **-0.468,
+p=0.50**. Random substitutions are "accommodated" at least as well as steered
+ones. The controls did exactly the job they were added for.
+
+`d_mutant` is also confounded independently of that result, and this was
+flagged at the start of the day then designed in anyway: the mutant backbone
+was folded by Boltz **from the mutant sequence**, so the substitution is baked
+into the geometry before ProteinMPNN reads it. MPNN's
+`--unconditional_probs_only` closes the leak through MPNN and leaves the leak
+through Boltz open. The random controls cancel that artifact (they are folded
+the same way), which is why the null is trustworthy -- but `d_mutant` should
+not be quoted as a standalone quantity. `d_native` has no such path: a native
+backbone is folded from the native sequence only.
+
+**2. `d_native` looks positive (d=1.15) but the comparison is confounded.**
+The claim is that MPNN favours E/K at `233`'s positions more than elsewhere in
+the same protein. Two problems:
+
+- **These designs are 45.5% E+K by composition** (E 25.8%, K 19.7% across the
+  20 handoff designs). `233` fires at E/K positions 50.2% of the time -- a
+  1.1x enrichment, not a discovery.
+- The score is `log P(E or K) - log P(native residue)`, so it is **near zero
+  wherever the native residue is already E or K**. The anchor-aware selector
+  keeps only sites whose native is *not* an anchor (all 20 handoff natives are
+  `DHIIILLLLNNQQQRRRSST`, zero E/K), while the baseline "other positions in
+  the same protein" retains the ~45% that are. Feature sites can score
+  positive against a baseline half-pinned at zero, from the selection alone.
+
+`06_steer/score_matched_baseline.py` settles it by holding native-residue
+identity fixed: each site is compared only against non-site positions carrying
+the **same** native residue (same design where >=3 exist, pooled across
+designs otherwise). It reports both comparisons, so the gap between them is
+the size of the artifact. It needs only the native `.npz` files -- no mutant
+structures, hence no Boltz leak, and no CIFs.
+
+Validated on synthetic backbones: with a uniform charge preference and **no
+feature effect at all**, the unmatched comparison returns **d=+1.50**
+(p<0.0001) while the matched one returns d=+0.18 (p=0.50). With a real effect
+injected, both stay significant (d=+5.13 and d=+3.29). **The pure-artifact
+simulation lands in the same range as the observed d=1.15**, so the observed
+value is consistent with zero structural signal until the matched test runs.
+
+Matched pool within the 20 designs is thin per residue (L 20, S 51, D 26,
+T 17, N 13, I 12, R 6, Q 5, H 0 -- 150 total), so pool across residue strata
+rather than testing each. A much larger baseline is available at no folding
+cost from the ~20,000 predicted structures in `data/vilip1_full20k/results/`
+on the local machine, though those are not on the cluster.
+
+**Status: matched test not yet run. Needs the 20 native `.npz` files.**
+No binding claim either way -- ΔipSAE was flat zero.
