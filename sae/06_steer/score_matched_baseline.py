@@ -56,12 +56,35 @@ def load_log_probs(path: Path) -> tuple[np.ndarray, str]:
     return shifted - np.log(np.exp(shifted).sum(axis=-1, keepdims=True)), alphabet
 
 
-def score(lp: np.ndarray, alphabet: str, pos: int, anchors: str, native_aa: str) -> float:
-    """log P(any anchor) - log P(native residue), at one position."""
+AA20 = "ACDEFGHIKLMNPQRSTVWY"
+
+
+def score(lp: np.ndarray, alphabet: str, pos: int, anchors: str, native_aa: str,
+          reference: str = "native", n_ref: int = 3, rng=None) -> float:
+    """log P(any anchor) minus a reference, at one position.
+
+    reference="native" -> minus log P(native residue). Asks "is the anchor
+        preferred over what is actually there".
+    reference="random" -> minus the mean log P of n_ref random residues that
+        are neither the native nor an anchor. Asks "is the anchor preferred
+        over an arbitrary alternative" -- which is the quantity the
+        steered-vs-random-control comparison computes, since log P(native)
+        cancels out of it.
+
+    The random reference needs the SAME matched treatment as the native one.
+    In a corpus that is ~45% E+K, log P(E/K) exceeds the mean log P of three
+    arbitrary residues at most surface positions regardless of any feature, so
+    a positive value alone says nothing; only its excess over matched
+    non-feature positions does.
+    """
     p_anchor = sum(exp(lp[pos, alphabet.index(a)]) for a in anchors if a in alphabet)
     if p_anchor <= 0:
         return float("-inf")
-    return log(p_anchor) - float(lp[pos, alphabet.index(native_aa)])
+    if reference == "native":
+        return log(p_anchor) - float(lp[pos, alphabet.index(native_aa)])
+    pool = [a for a in AA20 if a not in anchors and a != native_aa and a in alphabet]
+    picks = rng.sample(pool, min(n_ref, len(pool)))
+    return log(p_anchor) - float(np.mean([lp[pos, alphabet.index(a)] for a in picks]))
 
 
 def sign_test(values) -> tuple[int, int, float]:
@@ -79,11 +102,21 @@ def main() -> None:
                     help="structural_sites_*.csv: design_id, position, native_aa, mutated_sequence")
     ap.add_argument("--native-probs", type=Path, required=True, help="Dir of <design_id>.npz, NATIVE backbones")
     ap.add_argument("--anchors", default="EK", help="Anchor residues for this feature (233 -> EK)")
+    ap.add_argument("--reference", choices=["native", "random"], default="native",
+                    help="native: log P(anchor) - log P(native residue). random: minus the mean "
+                         "log P of --n-ref arbitrary non-native non-anchor residues, which is what "
+                         "the steered-vs-control comparison measures. Either way the matched "
+                         "contrast is the test; the raw value is confounded by composition.")
+    ap.add_argument("--n-ref", type=int, default=3)
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
+    import random as _random
     sites = list(csv.DictReader(open(args.sites)))
     anchors = args.anchors.strip().upper()
+    rng = _random.Random(args.seed)
+    sc = lambda lp, al, p, aa: score(lp, al, p, anchors, aa, args.reference, args.n_ref, rng)
 
     # Baseline pool: every non-site position, keyed by its native residue.
     pool_by_aa: dict[str, list[float]] = defaultdict(list)
@@ -109,12 +142,12 @@ def main() -> None:
         site_scores.append({
             "design_id": design, "resnum": r.get("resnum", ""), "position": pos,
             "native_aa": r["native_aa"],
-            "site_score": score(lp, alphabet, pos, anchors, r["native_aa"]),
+            "site_score": sc(lp, alphabet, pos, r["native_aa"]),
         })
         for i, aa in enumerate(native_seq):
             if i in site_positions[design] or aa not in alphabet:
                 continue
-            s = score(lp, alphabet, i, anchors, aa)
+            s = sc(lp, alphabet, i, aa)
             pool_by_aa[aa].append(s)
             pool_by_design_aa[(design, aa)].append(s)
 
@@ -156,7 +189,7 @@ def main() -> None:
         print(f"  {label:<34} mean {np.mean(vals):+.3f}  d={d:+.2f}  "
               f"{p}+/{n}-  sign test p={pv:.4f}")
 
-    print(f"\nScored {len(rows)} site(s), anchors '{anchors}'")
+    print(f"\nScored {len(rows)} site(s), anchors '{anchors}', reference '{args.reference}'")
     print(f"baseline pool sizes by native residue: "
           f"{ {aa: len(v) for aa, v in sorted(pool_by_aa.items())} }")
     print("\nIs the anchor favoured at feature sites, relative to...")
