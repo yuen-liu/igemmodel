@@ -984,3 +984,83 @@ on the local machine, though those are not on the cluster.
 
 **Status: matched test not yet run. Needs the 20 native `.npz` files.**
 No binding claim either way -- ΔipSAE was flat zero.
+
+### Matched-baseline test on real MPNN output (2026-09-27, late)
+
+Ran on Andrew's 20 native `.npz` (`native_npz_233.tar.gz`). **The prediction
+that matching would kill the effect was wrong -- matching strengthened it.**
+
+**Two file-format facts that any rerun must handle.** The npz key is `log_p`,
+not `log_probs`, and its shape is `(1, L, 21)`. More importantly the structures
+are **binder-target complexes**: Vilip-1 occupies the first **191** residues
+and the binder follows, so `log_p` is `(1, 256, 21)` for a 65-residue binder.
+Site positions are binder-local, and the non-site **baseline must also be
+restricted to the binder** or it silently averages over target-chain
+positions. Andrew handled the offset correctly (his reported `native_aa`
+matches `S[191+position]` in 20/20 and the absolute index in 1/20, that one by
+coincidence). `score_matched_baseline.py` now locates the binder by finding the
+native sequence inside the structure's own sequence and refuses to guess.
+
+**Why my predicted mechanism was backwards.** I argued the baseline was
+half-pinned near zero because E/K-native positions give
+`log P(E or K) - log P(native) = 0`. It is not zero: the anchor set *contains*
+the native residue there, so the score is `log(1 + P(K)/P(E)) >= 0` and often
+clearly positive. Those 529 E/K-native baseline positions therefore **raise**
+the unmatched baseline and **suppress** the unmatched delta. Removing them by
+matching increases the effect. Andrew's choice to exclude E/K from his
+baseline was right; my unmatched figure is the downward-confounded one.
+
+| comparison | n | mean | +/- | sign p |
+|---|---|---|---|---|
+| unmatched (all other binder positions) | 20 | +0.670 | 16/4 | 0.0118 |
+| **matched on native residue, pooled baseline** | **20** | **+1.015** | **18/2** | **0.0004** |
+| matched, in-design baseline only | 17 | +0.951 | 14/3 | 0.0127 |
+
+Magnitude-aware tests on the pooled version agree: one-sample t p=0.0006,
+Wilcoxon p=0.0025. **Andrew's report that magnitude-aware tests go
+non-significant was an artifact of baseline size**, not a property of the
+effect: his in-design-only matching left 12 of 20 sites with <=2 matched
+controls and 3 with zero (dropping n to 17). Re-testing his own
+`matched_diff` column reproduces his p=0.049 exactly. Pooling across designs
+gives a median of 30 matched controls per site.
+
+**But the effect is not E/K-specific, which is the part that matters for the
+figure.** Repeating the matched test with the anchor scored against arbitrary
+residues instead of the native one (`--reference random`, the quantity the
+steered-vs-control comparison computes since `log P(native)` cancels from it):
+
+| comparison | n | mean | +/- | sign p |
+|---|---|---|---|---|
+| unmatched | 20 | -0.035 | 9/11 | 0.82 |
+| matched on native residue | 20 | +0.259 | 10/10 | **1.00** |
+
+So E/K gains no advantage over arbitrary residues at `233`'s positions.
+Decomposing the native-reference effect: `log P(native)` is -0.514 lower at
+sites (p=0.50) and `log P(E or K)` +0.502 higher (p=0.26) -- neither
+individually significant, the effect living in the difference. Probability
+mass shifts **off the native residue onto alternatives generally**, not onto
+E/K in particular.
+
+**What can honestly be claimed.** At positions feature `233` flags, ProteinMPNN
+assigns relatively less probability to the residue actually present than at
+native-residue-matched control positions (p=0.0004-0.0025 across three tests).
+Since those positions were chosen because ESM-C + the SAE wanted to change the
+residue, this is a genuine cross-model convergence: **a sequence model and a
+structure model independently agree the incumbent residue is suboptimal
+there.** What cannot be claimed is that these are E/K-tolerant or
+E/K-preferring environments.
+
+**Unresolved.** MPNN per-position entropy is +0.165 nats higher at `233`'s
+sites (14/6, p=0.115) -- not significant, but not excludable at n=20. If it
+holds at larger n the result weakens to "`233` fires at structurally ambiguous
+positions." Scaling to n=60-80 would settle both this and the E/K question.
+
+**Figure guidance.** Fig 1 as drafted ("E/K advantage vs every other position
+in the protein, d=1.15") should not be used: the unmatched comparison is the
+confounded one, and the surviving effect is not about E/K. A matched version
+plotting `site - mean(same-native-residue positions)` against a zero line is
+defensible, labelled as the native residue being disfavoured rather than E/K
+being preferred. Fig 2 (accommodation by arm, treatment below its own null) is
+sound as drafted. Fig 3 should not assert three independent confirmations: the
+energy and steering legs share the SAE and design corpus, and the structural
+leg supports a narrower claim than "structural tolerance".

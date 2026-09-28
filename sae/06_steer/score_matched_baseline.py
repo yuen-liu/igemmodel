@@ -34,9 +34,30 @@ import numpy as np
 MPNN_ALPHABET = "ACDEFGHIKLMNPQRSTVWYX"
 
 
+def locate_binder(data, native_seq: str, alphabet: str) -> int:
+    """Index at which `native_seq` starts inside the structure's sequence.
+
+    These are binder-vs-target complexes, so a structure holds the Vilip-1
+    target (191 residues) followed by the binder: log_p is (1, 256, 21) for a
+    65-residue binder. Site positions are binder-local, and -- more easily
+    missed -- the non-site BASELINE must be restricted to the binder too, or it
+    silently averages over target-chain positions instead.
+    """
+    if "S" not in data.files:
+        return 0
+    seq = "".join(alphabet[i] for i in np.asarray(data["S"]).ravel().tolist())
+    offset = seq.find(native_seq)
+    if offset < 0:
+        raise SystemExit(
+            "Could not locate the binder sequence inside the structure's own sequence; "
+            "refusing to guess the chain offset."
+        )
+    return offset
+
+
 def load_log_probs(path: Path) -> tuple[np.ndarray, str]:
     data = np.load(path, allow_pickle=True)
-    for key in ("log_probs", "logits", "probs"):
+    for key in ("log_probs", "log_p", "logits", "probs"):
         if key in data.files:
             arr = np.asarray(data[key], dtype=np.float64)
             break
@@ -121,7 +142,7 @@ def main() -> None:
     # Baseline pool: every non-site position, keyed by its native residue.
     pool_by_aa: dict[str, list[float]] = defaultdict(list)
     pool_by_design_aa: dict[tuple[str, str], list[float]] = defaultdict(list)
-    site_scores, missing = [], []
+    site_scores, missing, offsets = [], [], {}
     site_positions = defaultdict(set)
     for r in sites:
         site_positions[r["design_id"]].add(int(r["position"]))
@@ -135,19 +156,21 @@ def main() -> None:
         lp, alphabet = load_log_probs(path)
         mutant = r["mutated_sequence"]
         native_seq = mutant[:pos] + r["native_aa"] + mutant[pos + 1:]
-        if len(native_seq) != lp.shape[0]:
-            raise SystemExit(
-                f"{design}: sequence length {len(native_seq)} != structure length {lp.shape[0]}"
-            )
+        offset = locate_binder(np.load(path, allow_pickle=True), native_seq, alphabet)
+        if offset + len(native_seq) > lp.shape[0]:
+            raise SystemExit(f"{design}: binder at offset {offset} overruns structure {lp.shape[0]}")
+        assert native_seq[pos] == r["native_aa"]
+        offsets[design] = offset
         site_scores.append({
             "design_id": design, "resnum": r.get("resnum", ""), "position": pos,
-            "native_aa": r["native_aa"],
-            "site_score": sc(lp, alphabet, pos, r["native_aa"]),
+            "native_aa": r["native_aa"], "chain_offset": offset,
+            "site_score": sc(lp, alphabet, offset + pos, r["native_aa"]),
         })
+        # Baseline over the BINDER only -- never the target chain.
         for i, aa in enumerate(native_seq):
             if i in site_positions[design] or aa not in alphabet:
                 continue
-            s = sc(lp, alphabet, i, aa)
+            s = sc(lp, alphabet, offset + i, aa)
             pool_by_aa[aa].append(s)
             pool_by_design_aa[(design, aa)].append(s)
 
@@ -190,6 +213,9 @@ def main() -> None:
               f"{p}+/{n}-  sign test p={pv:.4f}")
 
     print(f"\nScored {len(rows)} site(s), anchors '{anchors}', reference '{args.reference}'")
+    if offsets:
+        print(f"binder chain offsets detected: {sorted(set(offsets.values()))} "
+              f"(baseline restricted to the binder, target chain excluded)")
     print(f"baseline pool sizes by native residue: "
           f"{ {aa: len(v) for aa, v in sorted(pool_by_aa.items())} }")
     print("\nIs the anchor favoured at feature sites, relative to...")
