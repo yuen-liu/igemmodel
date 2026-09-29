@@ -1077,3 +1077,43 @@ being preferred. Fig 2 (accommodation by arm, treatment below its own null) is
 sound as drafted. Fig 3 should not assert three independent confirmations: the
 energy and steering legs share the SAE and design corpus, and the structural
 leg supports a narrower claim than "structural tolerance".
+
+### Open gap: interaction energy was never computed on a steered mutant (2026-09-29)
+
+**Every energy number in this file is observational.** The Prime run covered
+only the 477 *unmutated* designs picked by `07_energy/select_energy_sample.py`.
+The steered mutants went to Boltz re-folding + ProteinMPNN and were scored for
+accommodation (null, -0.468, p=0.50) and ipSAE (flat zero) -- never for
+interaction energy. So the energy arm supports "designs that carry feature X
+bind more favourably" and has never tested "installing X changes binding
+energy", which is the causal form of the claim and the one a reader assumes.
+Anything built on the energy regression should say *associational*.
+
+**The experiment is already specified and mostly staged.**
+`structural_folds_233.fasta` holds the 100 folds for `233` -- 20 native,
+20 steered mutant, 60 random-substitution control, one site per design so the
+20 designs are independent observations. Running the existing Prime pipeline
+over them yields 20 paired DDE values with a built-in null, on the only feature
+that survives the steering controls.
+
+  07_energy/build_mutant_energy_inputs.py      ids + YAML + manifest, --stage-natives
+  07_energy/run_mutant_energy_profiling.bash   SLURM array, same shape as the 477 run
+  07_energy/analyze_mutant_energy.py           paired test, one effect per design
+
+**Blocker: the 80 mutant/control CIFs are not on the local machine.** All 20
+native backbones are (`data/vilip1_full20k/results/`, linked in by
+`--stage-natives`); the mutant and control folds are wherever Andrew ran them.
+That is a request to him, not compute.
+
+**The comparison to make is mutant vs. its own controls, not mutant vs. native.**
+The mutant backbone was folded from the mutant sequence, so the substitution is
+baked into the geometry before Prime reads it -- the same leak that made
+`d_mutant` unquotable in the accommodation arm. The controls are folded the
+same way and cancel it; mutant-minus-native does not and is secondary.
+
+**`dE_interaction` is not a stability measure.** It is a chain-split interaction
+energy (interface-restricted minimisation of the complex, then single-point
+energies of the isolated chains from that geometry). Lower means binds VILIP-1
+better, *not* a more thermostable binder -- that would need folding dG or a
+separately minimised apo state. Do not let "features associated with lower
+energy" become "features that make binders more stable" on a poster.
