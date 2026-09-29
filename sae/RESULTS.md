@@ -590,10 +590,23 @@ reliable, estimated from the ~440 designs that have them.)
 
 **Revised candidate priority for hand-off** (energy regression + steering,
 superseding the raw-average-based priority above): **`6073`** (solid
-presence effect + real steering signal) is the clearest single candidate.
-`10586` and `4657` are borderline-significant presence effects, both
-steering-consistent (`4657` confirmed via a higher-alpha retest, see
-below) -- reasonable secondary candidates. `233` and `11326`'s activation
+presence effect, -30.1 kcal/mol, q=0.011) is the clearest single candidate
+*on the energy arm*. `10586` and `4657` are borderline-significant presence
+effects -- reasonable secondary candidates on the same arm.
+
+> **Corrected (2026-09-29).** This paragraph originally credited `6073` with
+> a "real steering signal" and called `10586`/`4657` "steering-consistent."
+> That was written against the pre-control steering rates and contradicts the
+> retraction block above. Under the norm-matched controls all three are null:
+> `6073` -2.4pp (p=0.75), `10586` -2.6pp (p=0.75), `4657` -1.1pp (p=0.51);
+> `4657`'s 8x retest is Bonferroni 0.056, which is not confirmation. Their
+> **energy** effects are unaffected and stand as reported. **`233` is the only
+> feature with a real effect on both arms** (activation -13.5 kcal/mol q=0.011;
+> steering +2.8pp p=5.0e-09). Consolidated per-feature view, both arms, controls
+> only: `sae/results/run4/feature_summary.csv` (built by
+> `scripts/build_feature_summary.py`).
+
+`233` and `11326`'s activation
 effects are the most statistically robust finding overall, but both are
 near-universal (fire in ~93-100% of designs), so they're not useful as
 "introduce this feature into a new design" candidates the way rare
