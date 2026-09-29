@@ -101,6 +101,37 @@ def main():
     report("ddE_vs_control", "mutant - random-substitution controls", True)
     report("ddE_vs_native", "mutant - native", False)
 
+    # Diagnostic. The native was never steered, so native-minus-control should
+    # sit at zero. If it does not, the control set carries a systematic offset
+    # -- in the 2026-09-29 run, controls installed bulky residues (W, I, Q, F)
+    # while every mutant installed K or E, and Prime's interaction energy
+    # tracks how much residue sits at the interface. Any mutant-minus-control
+    # effect smaller than this offset is measuring the amino acid, not the
+    # feature.
+    nat = (paired["dE_native"] - paired["dE_control_mean"]).dropna()
+    if len(nat) >= 3:
+        _, p_nat = stats.ttest_1samp(nat, 0.0)
+        print(f"DIAGNOSTIC  native - controls: mean={nat.mean():+.2f} kcal/mol, p={p_nat:.4f}")
+        print("  Should be ~0. A non-zero offset here is a property of the control")
+        print("  set, not of steering -- compare it against the primary effect above.\n")
+
+    # Power. The between-design energy association this arm was built to probe
+    # is -13.5 kcal/mol per SD of max_activation.
+    sd = paired["ddE_vs_control"].std(ddof=1)
+    n = paired["ddE_vs_control"].notna().sum()
+    if n >= 3 and sd > 0:
+        mde = 2.87 * sd / np.sqrt(n)
+        print(f"POWER  paired SD={sd:.1f} kcal/mol, n={n} -> minimum detectable effect "
+              f"~{mde:.0f} kcal/mol (80% power, two-sided 0.05)\n")
+
+    print("Interpreting a null here: the regression predictor is max_activation,")
+    print("the MAXIMUM over positions in a design. These designs already carry 7-21")
+    print("233 sites each, so installing one more anchor moves max_activation by")
+    print("roughly nothing -- the model's own predicted effect for this mutation is")
+    print("~0, not -13.5. A null is consistent with the energy association being real.")
+    print("This tests a within-design single-residue perturbation, not the")
+    print("between-design association.\n")
+
     print("Reminder: dE_interaction is a Prime chain-split interaction energy, not a")
     print("binding free energy and not a folding/thermostability measure.")
 

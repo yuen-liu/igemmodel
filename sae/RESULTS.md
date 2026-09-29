@@ -1078,16 +1078,16 @@ sound as drafted. Fig 3 should not assert three independent confirmations: the
 energy and steering legs share the SAE and design corpus, and the structural
 leg supports a narrower claim than "structural tolerance".
 
-### Open gap: interaction energy was never computed on a steered mutant (2026-09-29)
+### Interaction energy on steered mutants: run, and uninformative (2026-09-29)
 
-**Every energy number in this file is observational.** The Prime run covered
-only the 477 *unmutated* designs picked by `07_energy/select_energy_sample.py`.
-The steered mutants went to Boltz re-folding + ProteinMPNN and were scored for
-accommodation (null, -0.468, p=0.50) and ipSAE (flat zero) -- never for
-interaction energy. So the energy arm supports "designs that carry feature X
-bind more favourably" and has never tested "installing X changes binding
-energy", which is the causal form of the claim and the one a reader assumes.
-Anything built on the energy regression should say *associational*.
+**The energy regression remains observational, and this run does not change
+that.** Until 2026-09-29 the Prime numbers covered only the 477 *unmutated*
+designs from `07_energy/select_energy_sample.py`; the steered mutants had been
+scored for ProteinMPNN accommodation (null, -0.468, p=0.50) and ipSAE (flat
+zero) but never for interaction energy. That gap is now closed mechanically --
+all 100 structural-arm folds have been profiled -- but the result does not
+license a causal claim in either direction, for the reasons below. Anything
+built on the energy regression should still say *associational*.
 
 **The experiment is already specified and mostly staged.**
 `structural_folds_233.fasta` holds the 100 folds for `233` -- 20 native,
@@ -1100,10 +1100,54 @@ that survives the steering controls.
   07_energy/run_mutant_energy_profiling.bash   SLURM array, same shape as the 477 run
   07_energy/analyze_mutant_energy.py           paired test, one effect per design
 
-**Blocker: the 80 mutant/control CIFs are not on the local machine.** All 20
-native backbones are (`data/vilip1_full20k/results/`, linked in by
-`--stage-natives`); the mutant and control folds are wherever Andrew ran them.
-That is a request to him, not compute.
+**Ran 2026-09-29** on Andrew's `9_29_f233_results/structures` (all 100 folds,
+naming matched, no prep failures; energies -123 to -435 kcal/mol, comparable to
+the 477-design run's ~-184).
+
+| comparison | n | mean | t p | Wilcoxon p |
+|---|---|---|---|---|
+| mutant - random-substitution controls (primary) | 20 | **+16.98** | 0.207 | 0.123 |
+| mutant - native (confounded by the refold) | 20 | +3.11 | 0.849 | 0.898 |
+| *native - controls* (diagnostic, should be ~0) | 20 | *+13.87* | *0.204* | -- |
+
+**Do not report this as "steering does not improve binding energy."** It is
+uninformative, for three separate reasons, in order of importance:
+
+**1. The mutation barely moves the regression's predictor.** The energy
+coefficient is -13.5 kcal/mol *per SD of `max_activation`* -- the MAXIMUM
+activation over positions in a design (SD 2.08 across the 444 designs that
+carry `233`). Each of these 20 designs already has `233` firing at **7-21
+positions**. Installing one more anchor at one position raises the maximum only
+if the new site out-activates the existing best, which it generally will not.
+**The model's own predicted effect for this mutation is ~0, not -13.5.** The
+regression is a between-design statement; this experiment is a within-design
+single-residue perturbation. They are different quantities, and a null on the
+second is fully consistent with the first being real. (Only 2 of these 20
+designs are even in the 477-design energy set the regression was fit on.)
+
+**2. Underpowered regardless.** Paired SD is 58.1 kcal/mol, so at n=20 the
+minimum detectable effect is ~37 kcal/mol -- larger than the between-design
+association it was meant to probe.
+
+**3. The control set is not residue-matched.** Every mutant installs K (14/20)
+or E (6/20); the controls install a broad spread dominated by bulky residues.
+Among controls, K/R/E average -198.2 kcal/mol and everything else -257.8, a
+59.6 kcal/mol gap (per-residue: W -340.8, I -322.7, Q -291.0 vs K -123.3).
+Prime's interaction energy tracks how much residue sits at the interface, so
+mutant-vs-control partly measures the amino acid. The `native - controls`
+diagnostic (+13.87) is the tell: the native was never steered, so that offset
+is a property of the control set. **0 of 20 designs has a control installing
+the same residue as its mutant**, so this batch cannot separate the two.
+This is the same failure mode the matched-baseline test caught in the MPNN arm
+-- a baseline not matched on residue identity.
+
+**To actually test the energy claim** you need designs differing substantially
+in `max_activation`, not one extra site on a design that has twenty: steer hard
+enough at the top-activating position to move the design's maximum, or compare
+across the activation range with matched composition. For the residue confound
+specifically, controls installing K/E at *non-`233`* positions in the same
+designs -- matched on residue, varied on position, inverting the current
+design. n~60-80 for power, which the E/K question needs anyway.
 
 **The comparison to make is mutant vs. its own controls, not mutant vs. native.**
 The mutant backbone was folded from the mutant sequence, so the substitution is
