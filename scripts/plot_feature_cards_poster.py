@@ -33,6 +33,15 @@ DEFAULT_OUT_DIR = os.path.join(REPO_ROOT, "figures")
 
 N_CONTEXTS = 5
 
+# Added to every font size on the card. Bumping text without widening the card
+# will overrun the borders, so main() widens per bump to match.
+BUMP = 0
+
+
+def fs(delta=0):
+    return LEGEND_SIZE + delta + BUMP
+
+
 # "n candidate designs (of 64,998)" as reported in sae/RESULTS.md's feature
 # table. Recomputing these needs the 210 MB interface_features_combined.yaml.
 N_DESIGNS = {233: "46,327", 6073: "273", 11326: "64,997", 14247: "46,995",
@@ -70,30 +79,30 @@ def card(ax, feat, summary, contexts):
         (0.02, 0.905), 0.96, 0.075, facecolor=color, edgecolor="none",
         transform=ax.transAxes, zorder=1))
 
-    ax.text(0.06, 0.9425, f"Feature {feat}", fontsize=LEGEND_SIZE + 1,
+    ax.text(0.06, 0.9425, f"Feature {feat}", fontsize=fs(1),
             fontweight="bold", color="white", va="center", zorder=2)
     # Verdict on its own line below the bar. Right-aligning it beside the
     # feature name collides once the card is narrow enough for the poster.
-    ax.text(0.06, 0.862, row["verdict"], fontsize=LEGEND_SIZE - 5,
+    ax.text(0.06, 0.862, row["verdict"], fontsize=fs(-5),
             color=color, fontweight="bold", va="center")
 
     # Wrapped, not shrunk: at the narrow card width these labels overrun the
     # right border on one line, and shrinking them further costs legibility.
     for i, line in enumerate(textwrap.wrap(HEADLINE[feat], width=30)[:2]):
-        ax.text(0.06, 0.805 - i * 0.045, line, fontsize=LEGEND_SIZE - 4,
+        ax.text(0.06, 0.805 - i * 0.045, line, fontsize=fs(-4),
                 style="italic", color="#333333", va="center")
 
     # The right-hand column is the SAE activation at the bracketed residue;
     # label it, or the numbers read as unexplained.
-    ax.text(0.06, 0.700, "Top activating sites", fontsize=LEGEND_SIZE - 6,
+    ax.text(0.06, 0.700, "Top activating sites", fontsize=fs(-6),
             color="#7A7A7A", va="center")
-    ax.text(0.94, 0.700, "activation", fontsize=LEGEND_SIZE - 6,
+    ax.text(0.94, 0.700, "activation", fontsize=fs(-6),
             color="#7A7A7A", ha="right", va="center")
     y = 0.640
     for _, c in contexts.iterrows():
-        ax.text(0.06, y, c["context"], fontsize=LEGEND_SIZE - 4,
+        ax.text(0.06, y, c["context"], fontsize=fs(-4),
                 family="monospace", color="#1A1A1A", va="center")
-        ax.text(0.94, y, f"{c['activation']:.1f}", fontsize=LEGEND_SIZE - 6,
+        ax.text(0.94, y, f"{c['activation']:.1f}", fontsize=fs(-6),
                 family="monospace", color="#8A8A8A", ha="right", va="center")
         y -= 0.056
 
@@ -115,8 +124,8 @@ def card(ax, feat, summary, contexts):
     # value line: side-by-side made the card as wide as its longest string.
     y -= 0.060
     for k, v in stats:
-        ax.text(0.06, y, k, fontsize=LEGEND_SIZE - 6, color="#7A7A7A", va="center")
-        ax.text(0.06, y - 0.045, v, fontsize=LEGEND_SIZE - 4, color="#1A1A1A",
+        ax.text(0.06, y, k, fontsize=fs(-6), color="#7A7A7A", va="center")
+        ax.text(0.06, y - 0.045, v, fontsize=fs(-4), color="#1A1A1A",
                 va="center")
         y -= 0.098
 
@@ -127,13 +136,18 @@ def main():
     ap.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
     ap.add_argument("--stem", default="vilip1_feature_cards_poster")
     ap.add_argument("--dpi", type=int, default=400)
+    ap.add_argument("--font-bump", type=int, default=0,
+                    help="Add N points to every font size; the card widens to match.")
     args = ap.parse_args()
+
+    global BUMP
+    BUMP = args.font_bump
 
     feats = [int(f) for f in args.features.split(",")]
     summary = pd.read_csv(os.path.join(RUN4, "feature_summary.csv"))
     examples = pd.read_csv(os.path.join(RUN4, "feature_top_examples.csv"))
 
-    fig, axes = plt.subplots(1, len(feats), figsize=(4.3 * len(feats), 6.6))
+    fig, axes = plt.subplots(1, len(feats), figsize=(4.3 * (1 + 0.05 * BUMP) * len(feats), 6.6 * (1 + 0.02 * BUMP)))
     if len(feats) == 1:
         axes = [axes]
     for ax, feat in zip(axes, feats):
