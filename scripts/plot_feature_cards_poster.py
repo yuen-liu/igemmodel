@@ -136,7 +136,7 @@ def main():
     ap.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
     ap.add_argument("--stem", default="vilip1_feature_cards_poster")
     ap.add_argument("--dpi", type=int, default=400)
-    ap.add_argument("--font-bump", type=int, default=0,
+    ap.add_argument("--font-bump", type=int, default=2,
                     help="Add N points to every font size; the card widens to match.")
     args = ap.parse_args()
 
