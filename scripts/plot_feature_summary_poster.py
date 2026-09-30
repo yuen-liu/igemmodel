@@ -87,7 +87,7 @@ def load():
     return pd.read_csv(SUMMARY_CSV)
 
 
-def plot_scatter(df, out_dir, stem, dpi):
+def plot_scatter(df, out_dir, stem, dpi, title=None):
     fig, ax = plt.subplots(figsize=(14.5, 9))
 
     ax.axhline(0, color="#999999", linewidth=1.1, linestyle="--", zorder=1)
@@ -137,6 +137,12 @@ def plot_scatter(df, out_dir, stem, dpi):
     ax.set_ylabel("Steering excess vs. random (pp)", fontsize=LABEL_SIZE)
     ax.tick_params(axis="both", labelsize=TICK_SIZE, width=1.2, length=6)
     strip_spines(ax)
+
+    if title:
+        # Left-aligned over the plot area rather than centred over the axes --
+        # reads as a panel heading on a poster, not a chart caption.
+        ax.set_title(title, fontsize=LABEL_SIZE + 2, fontweight="bold",
+                     color="#1A1A1A", loc="left", pad=18)
 
     handles = [
         plt.Line2D([], [], marker="o", linestyle="none", color=NAVY,
@@ -242,10 +248,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out-dir", default=DEFAULT_OUT_DIR)
     ap.add_argument("--dpi", type=int, default=400)
+    ap.add_argument("--title", default="Energy and steering effects, by feature",
+                    help='Scatter panel heading. Pass "" for no title.')
     args = ap.parse_args()
 
     df = load()
-    plot_scatter(df, args.out_dir, "vilip1_feature_energy_vs_steering_poster", args.dpi)
+    plot_scatter(df, args.out_dir, "vilip1_feature_energy_vs_steering_poster",
+                 args.dpi, title=args.title or None)
     plot_table(df, args.out_dir, "vilip1_feature_summary_table_poster", args.dpi)
 
 
